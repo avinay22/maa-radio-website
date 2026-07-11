@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readSiteContent, writeSiteContent } from "@/lib/contentStore";
 import { SiteContent } from "@/data/siteContent";
+import { createClient } from "@supabase/supabase-js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/content
@@ -9,8 +9,13 @@ import { SiteContent } from "@/data/siteContent";
 // ─────────────────────────────────────────────────────────────────────────────
 export async function GET() {
   try {
-    const content = readSiteContent();
-    return NextResponse.json(content, { status: 200 });
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data, error } = await supabase.from('site_content').select('data').limit(1).single();
+    if (error || !data) return NextResponse.json({}, { status: 404 });
+    return NextResponse.json(data.data, { status: 200 });
   } catch {
     return NextResponse.json(
       { error: "Failed to read site content." },
@@ -41,7 +46,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
     }
 
-    writeSiteContent(body as SiteContent);
+    // Use Service Role Key to bypass RLS securely on the server
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: existing } = await supabase.from('site_content').select('id').limit(1).single();
+    
+    let res;
+    if (existing) {
+      res = await supabase.from('site_content').update({ data: body, updated_at: new Date().toISOString() }).eq('id', existing.id);
+    } else {
+      res = await supabase.from('site_content').insert({ data: body });
+    }
+
+    if (res.error) throw new Error(res.error.message);
+
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     console.error("[/api/admin/content POST]", err);

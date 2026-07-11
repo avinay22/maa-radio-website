@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, PhoneCall } from "lucide-react";
 import Logo from "./Logo";
-import { getSiteContent } from "@/data/siteContent";
+import { fetchSiteContent } from "@/lib/apiClient";
 
 const navLinks = [
   { name: "Home", href: "/" },
@@ -24,9 +24,10 @@ export default function Navbar() {
   const [phone, setPhone] = useState("+91 70027 33658");
 
   useEffect(() => {
-    const sc = getSiteContent();
-    setWhatsapp(sc.whatsapp);
-    setPhone(sc.phone);
+    fetchSiteContent().then((sc) => {
+      setWhatsapp(sc.whatsapp);
+      setPhone(sc.phone);
+    });
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };

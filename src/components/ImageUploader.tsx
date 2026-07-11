@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Upload, X, ImageIcon } from "lucide-react";
+import { Upload, X, ImageIcon, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface ImageUploaderProps {
   value: string; // current image URL or Base64
@@ -20,9 +21,10 @@ export default function ImageUploader({
 }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     setError("");
     if (!file.type.startsWith("image/")) {
       setError("Please select a valid image file (PNG, JPG, WebP, AVIF).");
@@ -32,11 +34,29 @@ export default function ImageUploader({
       setError(`Image must be under ${maxSizeMB}MB. Please compress or resize it first.`);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) onChange(e.target.result as string);
-    };
-    reader.readAsDataURL(file);
+
+    setIsUploading(true);
+    try {
+      const supabase = createClient();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file, { cacheControl: '31536000', upsert: false });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+      onChange(data.publicUrl);
+    } catch (err: any) {
+      setError(err.message || "Failed to upload image. Make sure Supabase storage is configured.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,10 +106,10 @@ export default function ImageUploader({
           }`}
         >
           <div className="w-12 h-12 rounded-sm bg-[#F8F8F6] border border-[#E2E2DF] flex items-center justify-center text-[#8A6A44] mb-4">
-            {isDragging ? <ImageIcon size={20} /> : <Upload size={20} />}
+            {isUploading ? <Loader2 size={20} className="animate-spin" /> : isDragging ? <ImageIcon size={20} /> : <Upload size={20} />}
           </div>
           <p className="text-sm font-bold text-[#222222]">
-            {isDragging ? "Drop image here" : "Drag & drop image here"}
+            {isUploading ? "Uploading..." : isDragging ? "Drop image here" : "Drag & drop image here"}
           </p>
           <p className="text-xs text-[#666666] mt-1">
             or{" "}

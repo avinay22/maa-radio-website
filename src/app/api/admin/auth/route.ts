@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const adminPassword =
-      process.env.ADMIN_PASSWORD ?? "ms2026"; // fallback for dev
+      process.env.ADMIN_PASSWORD ?? "mr2026"; // hardcoded default as requested
 
     if (password !== adminPassword) {
       // Deliberate delay to deter brute-force attempts

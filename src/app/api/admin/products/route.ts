@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readProducts, writeProducts } from "@/lib/productsStore";
 import { Product } from "@/data/products";
+import { createClient } from "@supabase/supabase-js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/products
@@ -9,7 +9,26 @@ import { Product } from "@/data/products";
 // ─────────────────────────────────────────────────────────────────────────────
 export async function GET() {
   try {
-    const products = readProducts();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    if (error || !data) return NextResponse.json([], { status: 404 });
+
+    const products = data.map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      brand: d.brand,
+      category: d.category as any,
+      price: d.price || undefined,
+      image: d.image || "",
+      description: d.description || "",
+      featured: d.featured || false,
+      isAccessoryPageOnly: d.is_accessory_page_only || false,
+      specifications: d.specifications || []
+    }));
+
     return NextResponse.json(products, { status: 200 });
   } catch {
     return NextResponse.json(
@@ -40,7 +59,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payload. Expected an array." }, { status: 400 });
     }
 
-    writeProducts(body);
+    // Use Service Role Key to bypass RLS securely on the server
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    const currentIds = body.map(p => p.id);
+    if (currentIds.length > 0) {
+      await supabase.from('products').delete().not('id', 'in', `(${currentIds.join(',')})`);
+    } else {
+      await supabase.from('products').delete().neq('id', 'dummy'); 
+    }
+    
+    if (body.length > 0) {
+      const toUpsert = body.map(p => ({
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        category: p.category,
+        price: p.price,
+        image: p.image,
+        description: p.description,
+        featured: p.featured || false,
+        is_accessory_page_only: p.isAccessoryPageOnly || false,
+        specifications: p.specifications
+      }));
+  
+      const res = await supabase.from('products').upsert(toUpsert);
+      if (res.error) throw new Error(res.error.message);
+    }
+
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     console.error("[/api/admin/products POST]", err);

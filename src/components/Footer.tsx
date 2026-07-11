@@ -2,14 +2,11 @@ import React from "react";
 import Link from "next/link";
 import Logo from "./Logo";
 import { Phone, MessageSquare, ShieldCheck, MapPin } from "lucide-react";
-import { DEFAULT_SITE_CONTENT } from "@/data/siteContent";
+import { fetchSiteContent } from "@/lib/apiClient";
 
-// Footer reads from DEFAULT_SITE_CONTENT at build time.
-// The public website uses a client-side SiteContentFooter wrapper
-// that hydrates from localStorage on the browser.
-// This keeps the footer SEO-renderable without a client boundary.
-export default function Footer() {
-  const sc = DEFAULT_SITE_CONTENT;
+// Footer fetches live from Supabase (Server Component)
+export default async function Footer() {
+  const sc = await fetchSiteContent();
   const currentYear = new Date().getFullYear();
 
   return (

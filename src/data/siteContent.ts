@@ -17,6 +17,36 @@ export interface Review {
   location: string;
 }
 
+export interface Offer {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  terms: string;
+}
+
+export interface ComboDeal {
+  id: string;
+  title: string;
+  description: string;
+  items: string;
+  price: string;
+}
+
+export interface Gift {
+  id: string;
+  title: string;
+  description: string;
+  conditions: string;
+}
+
+export interface EMIOffer {
+  id: string;
+  provider: string;
+  plan: string;
+  description: string;
+}
+
 export interface SiteContent {
   // ── Business Identity ──────────────────────────────────────────────────────
   businessName: string;
@@ -83,6 +113,20 @@ export interface SiteContent {
   aboutParagraph3: string;
   aboutOwnerTitle: string;
   aboutOwnerQuote: string;
+
+  // ── Deals & Offers ─────────────────────────────────────────────────────────
+  offersLabel: string;
+  offersHeading: string;
+  offers: Offer[];
+  comboDealsLabel: string;
+  comboDealsHeading: string;
+  comboDeals: ComboDeal[];
+  giftsLabel: string;
+  giftsHeading: string;
+  gifts: Gift[];
+  emiLabel: string;
+  emiHeading: string;
+  emiOffers: EMIOffer[];
 }
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
@@ -231,6 +275,20 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   aboutOwnerTitle: "Founder & Active Owner",
   aboutOwnerQuote:
     '"We don\'t just sell electronics. We build lifelong relationships. Every product I procure is verified as if I were using it in my own home."',
+
+  // ── Deals & Offers ─────────────────────────────────────────────────────────
+  offersLabel: "SPECIAL OFFERS",
+  offersHeading: "Exclusive Store Deals",
+  offers: [],
+  comboDealsLabel: "COMBO DEALS",
+  comboDealsHeading: "Save More With Combos",
+  comboDeals: [],
+  giftsLabel: "FREE GIFTS",
+  giftsHeading: "Complimentary With Purchase",
+  gifts: [],
+  emiLabel: "EASY FINANCE",
+  emiHeading: "Flexible EMI Options",
+  emiOffers: [],
 };
 
 const STORAGE_KEY = "maa_radio_site_content";

@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRight, ShieldCheck, HeartHandshake,
   Sparkles, Phone, MessageSquare, MapPin,
-  Gift, CreditCard, Wrench, Star,
+  Gift, CreditCard, Wrench, Star, Layers
 } from "lucide-react";
 import { SiteContent, DEFAULT_SITE_CONTENT } from "@/data/siteContent";
 import { fetchSiteContent } from "@/lib/apiClient";
@@ -268,6 +268,97 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* 4.5. Promotions, Combos, EMI, Gifts */}
+      {(sc.offers?.length > 0 || sc.comboDeals?.length > 0 || sc.gifts?.length > 0 || sc.emiOffers?.length > 0) && (
+        <section className="py-24 bg-white border-b border-[#E2E2DF]">
+          <div className="max-w-7xl mx-auto px-6 md:px-12">
+            
+            {/* Offers */}
+            {sc.offers?.length > 0 && (
+              <div className="mb-20">
+                <div className="max-w-2xl mb-12">
+                  <span className="text-[10px] font-bold tracking-widest text-[#8A6A44] uppercase">{sc.offersLabel}</span>
+                  <h2 className="text-3xl font-extrabold text-[#222222] mt-2">{sc.offersHeading}</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {sc.offers.map((offer) => (
+                    <motion.div key={offer.id} whileHover={{ y: -5 }} className="bg-[#F8F8F6] border border-[#E2E2DF] flex flex-col sm:flex-row overflow-hidden group">
+                      {offer.image && (
+                        <div className="w-full sm:w-2/5 shrink-0 border-b sm:border-b-0 sm:border-r border-[#E2E2DF] bg-white p-6 flex items-center justify-center">
+                          <img src={offer.image} alt={offer.title} className="w-full h-auto object-contain max-h-[160px] group-hover:scale-105 transition-transform" />
+                        </div>
+                      )}
+                      <div className="p-8 flex flex-col justify-center w-full">
+                        <h3 className="text-xl font-bold text-[#222222] mb-2">{offer.title}</h3>
+                        <p className="text-[#666666] text-sm mb-4 leading-relaxed">{offer.description}</p>
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#8A6A44]">{offer.terms}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+              {/* Combo Deals */}
+              {sc.comboDeals?.length > 0 && (
+                <div className="flex flex-col gap-6">
+                  <div>
+                    <span className="text-[10px] font-bold tracking-widest text-[#8A6A44] uppercase">{sc.comboDealsLabel}</span>
+                    <h3 className="text-2xl font-bold text-[#222222] mt-1">{sc.comboDealsHeading}</h3>
+                  </div>
+                  {sc.comboDeals.map((combo) => (
+                    <div key={combo.id} className="border border-[#E2E2DF] p-6 bg-[#F8F8F6]">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold text-[#222222]">{combo.title}</h4>
+                        <span className="text-sm font-bold text-[#7A2E2E]">{combo.price}</span>
+                      </div>
+                      <p className="text-xs text-[#666666] mb-3 leading-relaxed">{combo.description}</p>
+                      <div className="text-[10px] uppercase font-bold tracking-wider text-[#8A6A44] flex items-center gap-1.5"><Layers size={12} /> {combo.items}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Free Gifts */}
+              {sc.gifts?.length > 0 && (
+                <div className="flex flex-col gap-6">
+                  <div>
+                    <span className="text-[10px] font-bold tracking-widest text-[#8A6A44] uppercase">{sc.giftsLabel}</span>
+                    <h3 className="text-2xl font-bold text-[#222222] mt-1">{sc.giftsHeading}</h3>
+                  </div>
+                  {sc.gifts.map((gift) => (
+                    <div key={gift.id} className="border border-[#E2E2DF] p-6 bg-[#F8F8F6]">
+                      <h4 className="font-bold text-[#222222] mb-2">{gift.title}</h4>
+                      <p className="text-xs text-[#666666] mb-3 leading-relaxed">{gift.description}</p>
+                      <div className="text-[10px] uppercase font-bold tracking-wider text-[#7A2E2E] flex items-center gap-1.5"><Gift size={12} /> {gift.conditions}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* EMI */}
+              {sc.emiOffers?.length > 0 && (
+                <div className="flex flex-col gap-6">
+                  <div>
+                    <span className="text-[10px] font-bold tracking-widest text-[#8A6A44] uppercase">{sc.emiLabel}</span>
+                    <h3 className="text-2xl font-bold text-[#222222] mt-1">{sc.emiHeading}</h3>
+                  </div>
+                  {sc.emiOffers.map((emi) => (
+                    <div key={emi.id} className="border border-[#E2E2DF] p-6 bg-[#F8F8F6]">
+                      <h4 className="font-bold text-[#222222] mb-2">{emi.provider}</h4>
+                      <p className="text-xs text-[#666666] mb-3 leading-relaxed">{emi.description}</p>
+                      <div className="text-[10px] uppercase font-bold tracking-wider text-[#8A6A44] flex items-center gap-1.5"><CreditCard size={12} /> {emi.plan}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        </section>
+      )}
 
       {/* 5. Why Choose Us */}
       <section className="py-24 bg-white">

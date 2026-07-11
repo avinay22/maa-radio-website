@@ -4,9 +4,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Lock, LogOut, Save, Plus, Trash2, ShieldAlert, Sparkles,
   Building2, Home, Star, Image, Package, Users, CheckCircle, AlertCircle, Loader2,
+  Tag, Gift, CreditCard, Layers
 } from "lucide-react";
 import {
-  SiteContent, WhyCard, Review,
+  SiteContent, WhyCard, Review, Offer, ComboDeal, Gift as GiftType, EMIOffer,
   DEFAULT_SITE_CONTENT,
 } from "@/data/siteContent";
 import { Product, INITIAL_PRODUCTS } from "@/data/products";
@@ -15,6 +16,7 @@ import {
   fetchSiteContent, saveSiteContentApi,
   fetchProducts, saveProductsApi,
 } from "@/lib/apiClient";
+import { OffersTab, CombosTab, GiftsTab, EMITab } from "./DealsTabs";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -25,7 +27,11 @@ type Tab =
   | "brands"
   | "reviews"
   | "gallery"
-  | "products";
+  | "products"
+  | "offers"
+  | "combos"
+  | "gifts"
+  | "emi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SMALL HELPERS
@@ -1005,6 +1011,10 @@ function ProductsTab({ token }: ProductsTabProps) {
 const TABS: { id: Tab; label: string; Icon: React.ElementType }[] = [
   { id: "business", label: "Business", Icon: Building2 },
   { id: "homepage", label: "Homepage", Icon: Home },
+  { id: "offers", label: "Offers", Icon: Tag },
+  { id: "combos", label: "Combos", Icon: Layers },
+  { id: "gifts", label: "Free Gifts", Icon: Gift },
+  { id: "emi", label: "EMI Options", Icon: CreditCard },
   { id: "brands", label: "Brands", Icon: Star },
   { id: "reviews", label: "Reviews", Icon: Users },
   { id: "gallery", label: "Gallery", Icon: Image },
@@ -1023,14 +1033,14 @@ export default function AdminPage() {
   const [content, setContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
   const [token, setToken] = useState("");
 
-  // On mount — check sessionStorage for existing session token
+  // Restore session from sessionStorage on mount
   useEffect(() => {
-    const storedToken = sessionStorage.getItem("maa_admin_token");
-    if (storedToken) {
+    const saved = sessionStorage.getItem("admin_token");
+    if (saved) {
+      setToken(saved);
       setIsAuthenticated(true);
-      setToken(storedToken);
+      fetchSiteContent().then(setContent);
     }
-    fetchSiteContent().then(setContent);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -1044,13 +1054,13 @@ export default function AdminPage() {
         body: JSON.stringify({ password }),
       });
       const data = await res.json();
-      if (res.ok && data.token) {
-        sessionStorage.setItem("maa_admin_token", data.token);
+      if (!res.ok) {
+        setLoginError(data.error ?? "Invalid password. Please try again.");
+      } else {
+        sessionStorage.setItem("admin_token", data.token);
         setToken(data.token);
         setIsAuthenticated(true);
         fetchSiteContent().then(setContent);
-      } else {
-        setLoginError(data.error ?? "Authentication failed.");
       }
     } catch {
       setLoginError("Network error. Please try again.");
@@ -1060,7 +1070,7 @@ export default function AdminPage() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem("maa_admin_token");
+    sessionStorage.removeItem("admin_token");
     setToken("");
     setIsAuthenticated(false);
     setPassword("");
@@ -1169,6 +1179,10 @@ export default function AdminPage() {
         <main className="flex-1 overflow-y-auto">
           {activeTab === "business" && <BusinessTab content={content} setContent={setContent} token={token} />}
           {activeTab === "homepage" && <HomepageTab content={content} setContent={setContent} token={token} />}
+          {activeTab === "offers" && <OffersTab content={content} setContent={setContent} token={token} />}
+          {activeTab === "combos" && <CombosTab content={content} setContent={setContent} token={token} />}
+          {activeTab === "gifts" && <GiftsTab content={content} setContent={setContent} token={token} />}
+          {activeTab === "emi" && <EMITab content={content} setContent={setContent} token={token} />}
           {activeTab === "brands" && <BrandsTab content={content} setContent={setContent} token={token} />}
           {activeTab === "reviews" && <ReviewsTab content={content} setContent={setContent} token={token} />}
           {activeTab === "gallery" && <GalleryTab content={content} setContent={setContent} token={token} />}
