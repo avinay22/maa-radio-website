@@ -31,12 +31,24 @@ export async function GET() {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
-    // Validate the session token — must be present (issued by /api/admin/auth)
+    // Validate the session token — must be present and valid in Supabase Auth
     const authHeader = request.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "").trim();
     if (!token) {
       return NextResponse.json(
         { error: "Unauthorized. Please log in." },
+        { status: 401 }
+      );
+    }
+
+    const supabaseAnon = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data: { user }, error: authError } = await supabaseAnon.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized. Session is invalid or expired." },
         { status: 401 }
       );
     }

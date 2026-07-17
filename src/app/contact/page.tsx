@@ -2,22 +2,23 @@
 
 import React, { useState, useEffect } from "react";
 import { Phone, MessageSquare, Mail, MapPin, Clock, Shield } from "lucide-react";
-import { getSiteContent, SiteContent, DEFAULT_SITE_CONTENT } from "@/data/siteContent";
+import { SiteContent, DEFAULT_SITE_CONTENT, STATIC_CONTENT } from "@/data/siteContent";
+import { fetchSiteContent } from "@/lib/apiClient";
 
 export default function ContactPage() {
   const [sc, setSc] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
 
   useEffect(() => {
-    setSc(getSiteContent());
+    fetchSiteContent().then(setSc);
   }, []);
 
   return (
     <div className="bg-white pt-28 pb-20 min-h-screen">
       <div className="max-w-7xl mx-auto px-6 md:px-12">
 
-        <div className="border-b border-border pb-10 mb-16">
+        <div className="border-b border-[#E2E2DF] pb-10 mb-16">
           <span className="text-[10px] font-bold tracking-widest text-[#8A6A44] uppercase">
-            Store Location & Contact
+            Store Location &amp; Contact
           </span>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-[#222222] mt-2">VISIT MAA RADIO TODAY</h1>
           <p className="text-[#666666] text-sm mt-4 max-w-xl">
@@ -33,9 +34,9 @@ export default function ContactPage() {
               <span className="text-[9px] font-bold text-[#8A6A44] uppercase tracking-widest block mb-1">
                 Store Administrator
               </span>
-              <h3 className="text-xl font-bold text-[#222222]">{sc.ownerName}</h3>
+              <h3 className="text-xl font-bold text-[#222222]">{STATIC_CONTENT.ownerName}</h3>
               <p className="text-xs text-[#666666] mt-2">
-                {sc.ownerName} manages the operations, handles individual product sourcing queries, and oversees technical verification.
+                {STATIC_CONTENT.ownerName} manages the operations, handles individual product sourcing queries, and oversees technical verification.
               </p>
             </div>
 
@@ -90,7 +91,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-[#222222]">Store Address</h4>
-                  <span className="text-sm font-semibold text-[#666666] mt-1 block">{sc.address}</span>
+                  <span className="text-sm font-semibold text-[#666666] mt-1 block">{STATIC_CONTENT.address}</span>
                 </div>
               </div>
             </div>
@@ -118,7 +119,7 @@ export default function ContactPage() {
             <div className="flex items-start gap-3 bg-[#F8F8F6] border border-[#E2E2DF] p-4">
               <MapPin className="text-[#8A6A44] mt-0.5 flex-shrink-0" size={18} />
               <p className="text-xs text-[#666666] leading-relaxed">
-                <strong>Visit Us:</strong> {sc.address}. Call us if you need help finding the storefront.
+                <strong>Visit Us:</strong> {STATIC_CONTENT.address}. Call us if you need help finding the storefront.
               </p>
             </div>
           </div>

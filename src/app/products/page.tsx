@@ -2,38 +2,47 @@
 
 import React, { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, MessageSquare, SlidersHorizontal, RefreshCw } from "lucide-react";
+import { Search, MessageSquare, SlidersHorizontal, RefreshCw, Package } from "lucide-react";
 import { Product } from "@/data/products";
-import { fetchProducts } from "@/lib/apiClient";
+import { SiteContent, DEFAULT_SITE_CONTENT, STATIC_CONTENT } from "@/data/siteContent";
+import { fetchProducts, fetchSiteContent } from "@/lib/apiClient";
 
 function ProductsCatalog() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category");
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [sc, setSc] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [selectedBrand, setSelectedBrand] = useState<string>("All");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Sync state with query parameters if present
+  // Sync state with query parameter
   useEffect(() => {
     if (initialCategory) {
       setSelectedCategory(initialCategory);
     }
   }, [initialCategory]);
 
-  // Load products from server (falls back to code defaults if no saved file)
+  // Load products and site content
   useEffect(() => {
     fetchProducts().then(setProducts);
+    fetchSiteContent().then(setSc);
   }, []);
 
-  // Get list of unique categories and brands for filter options
-  const categories = ["All", "Smartphones", "Accessories", "Audio", "Smart Watches", "Home Appliances"];
-  
-  const brands = ["All", ...Array.from(new Set(products.map((p) => p.brand)))];
+  // Build category list from admin-defined categories + "All"
+  const categories = [
+    "All",
+    ...sc.categories
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => c.name),
+  ];
 
-  // Filter products based on search term, category and brand
+  const brands = ["All", ...Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))];
+
+  // Filter products
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -46,9 +55,8 @@ function ProductsCatalog() {
     const matchesBrand =
       selectedBrand === "All" || product.brand === selectedBrand;
 
-    // Filter out items that are only meant for accessories tab if selected category is ALL, 
-    // but keep them if Accessories is specifically selected. This ensures catalog is cleaner.
-    const isAppropriateCatalogItem = 
+    // Accessory-only products are hidden unless Accessories is explicitly selected
+    const isAppropriateCatalogItem =
       selectedCategory === "Accessories" ? true : !product.isAccessoryPageOnly;
 
     return matchesSearch && matchesCategory && matchesBrand && isAppropriateCatalogItem;
@@ -62,16 +70,17 @@ function ProductsCatalog() {
 
   const getWhatsAppLink = (product: Product) => {
     const text = encodeURIComponent(
-      `Hi Tushar, I am interested in buying the ${product.brand} ${product.name} listed on your website. Is this item currently in stock?`
+      `Hi ${STATIC_CONTENT.ownerName}, I am interested in buying the ${product.brand} ${product.name} listed on your website. Is this item currently in stock?`
     );
-    return `https://wa.me/917002733658?text=${text}`;
+    return `https://wa.me/${sc.whatsapp || "917002733658"}?text=${text}`;
   };
 
   return (
     <div className="min-h-screen bg-white pt-28 pb-20">
       <div className="max-w-7xl mx-auto px-6 md:px-12">
+
         {/* Page Header */}
-        <div className="border-b border-border pb-10 mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="border-b border-[#E2E2DF] pb-10 mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <span className="text-[10px] font-bold tracking-widest text-[#8A6A44] uppercase">
               Digital Showcase
@@ -81,19 +90,17 @@ function ProductsCatalog() {
             </h1>
           </div>
           <p className="text-[#666666] text-sm max-w-sm">
-            Browse through our verified catalogue. Tap the WhatsApp button to verify stock, request delivery, or ask questions directly to Tushar Ghosh.
+            Browse our verified catalogue. Tap the WhatsApp button to verify stock, request delivery, or ask questions directly to {STATIC_CONTENT.ownerName}.
           </p>
         </div>
 
         {/* Layout Grid: Filters Left, Grid Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          
-          {/* 1. Filters Sidebar (Desktop) */}
+
+          {/* Filters Sidebar (Desktop) */}
           <aside className="hidden lg:block lg:col-span-3 space-y-8">
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">
-                Search Products
-              </h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">Search Products</h3>
               <div className="relative">
                 <input
                   type="text"
@@ -107,9 +114,7 @@ function ProductsCatalog() {
             </div>
 
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">
-                Categories
-              </h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">Categories</h3>
               <div className="flex flex-col gap-2">
                 {categories.map((cat) => (
                   <button
@@ -128,9 +133,7 @@ function ProductsCatalog() {
             </div>
 
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">
-                Filter by Brand
-              </h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">Filter by Brand</h3>
               <div className="flex flex-col gap-2">
                 {brands.map((b) => (
                   <button
@@ -157,8 +160,8 @@ function ProductsCatalog() {
             </button>
           </aside>
 
-          {/* Mobile Filter Button */}
-          <div className="lg:hidden flex gap-4 w-full mb-6">
+          {/* Mobile Search + Filter Toggle */}
+          <div className="lg:hidden flex gap-4 w-full mb-6 col-span-full">
             <div className="relative flex-1">
               <input
                 type="text"
@@ -178,27 +181,20 @@ function ProductsCatalog() {
             </button>
           </div>
 
-          {/* Mobile Filters Drawer Modal */}
+          {/* Mobile Filters Drawer */}
           {showMobileFilters && (
             <div className="fixed inset-0 bg-black/40 z-50 flex justify-end lg:hidden">
               <div className="w-80 bg-white h-full p-8 overflow-y-auto flex flex-col justify-between">
                 <div className="space-y-8">
-                  <div className="flex justify-between items-center border-b border-border pb-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-[#222222]">
-                      Filter Products
-                    </h3>
-                    <button
-                      onClick={() => setShowMobileFilters(false)}
-                      className="text-xs font-bold text-[#7A2E2E] uppercase"
-                    >
+                  <div className="flex justify-between items-center border-b border-[#E2E2DF] pb-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-[#222222]">Filter Products</h3>
+                    <button onClick={() => setShowMobileFilters(false)} className="text-xs font-bold text-[#7A2E2E] uppercase">
                       Close
                     </button>
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#666666] mb-3">
-                      Categories
-                    </h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#666666] mb-3">Categories</h4>
                     <div className="flex flex-wrap gap-2">
                       {categories.map((cat) => (
                         <button
@@ -217,9 +213,7 @@ function ProductsCatalog() {
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#666666] mb-3">
-                      Brands
-                    </h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#666666] mb-3">Brands</h4>
                     <div className="flex flex-wrap gap-2">
                       {brands.map((b) => (
                         <button
@@ -240,10 +234,7 @@ function ProductsCatalog() {
 
                 <div className="space-y-3 mt-12">
                   <button
-                    onClick={() => {
-                      handleResetFilters();
-                      setShowMobileFilters(false);
-                    }}
+                    onClick={() => { handleResetFilters(); setShowMobileFilters(false); }}
                     className="w-full py-3 border border-[#E2E2DF] text-xs font-bold uppercase tracking-wider text-[#222222] text-center"
                   >
                     Clear All
@@ -259,19 +250,24 @@ function ProductsCatalog() {
             </div>
           )}
 
-          {/* 2. Product Grid (Col-span 9) */}
+          {/* Product Grid */}
           <main className="lg:col-span-9">
             {filteredProducts.length === 0 ? (
               <div className="text-center py-20 bg-[#F8F8F6] border border-[#E2E2DF]">
+                <Package size={40} className="mx-auto text-[#CCCCCC] mb-4" />
                 <p className="text-[#666666] text-sm mb-4">
-                  No products matched your active filters.
+                  {products.length === 0
+                    ? "No products in the catalogue yet. Check back soon or contact us directly."
+                    : "No products matched your active filters."}
                 </p>
-                <button
-                  onClick={handleResetFilters}
-                  className="text-xs font-bold text-[#7A2E2E] hover:text-[#5F2222] uppercase tracking-wider underline"
-                >
-                  Reset all filters
-                </button>
+                {products.length > 0 && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="text-xs font-bold text-[#7A2E2E] hover:text-[#5F2222] uppercase tracking-wider underline"
+                  >
+                    Reset all filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -280,8 +276,21 @@ function ProductsCatalog() {
                     key={product.id}
                     className="bg-[#F8F8F6] border border-[#E2E2DF] flex flex-col justify-between p-6 group hover:shadow-md transition-all duration-300 relative"
                   >
-                    {/* Top Detail */}
-                    <div className="flex justify-between items-start mb-6">
+                    {/* Badges row */}
+                    <div className="flex flex-wrap gap-1 mb-4">
+                      {product.newArrival && (
+                        <span className="text-[8px] bg-blue-50 border border-blue-200 text-blue-800 px-1.5 py-0.5 font-bold uppercase">New</span>
+                      )}
+                      {product.bestSeller && (
+                        <span className="text-[8px] bg-amber-50 border border-amber-200 text-amber-800 px-1.5 py-0.5 font-bold uppercase">Best Seller</span>
+                      )}
+                      {product.discountPercentage && (
+                        <span className="text-[8px] bg-[#7A2E2E] text-white px-1.5 py-0.5 font-bold uppercase">{product.discountPercentage} OFF</span>
+                      )}
+                    </div>
+
+                    {/* Top: Brand + Price */}
+                    <div className="flex justify-between items-start mb-3">
                       <div>
                         <span className="text-[9px] font-bold text-[#8A6A44] uppercase tracking-wider">
                           {product.brand}
@@ -290,31 +299,49 @@ function ProductsCatalog() {
                           {product.name}
                         </h3>
                       </div>
-                      {product.price && (
-                        <span className="text-xs font-semibold text-[#7A2E2E] bg-white px-2 py-1 border border-[#E2E2DF]">
-                          {product.price}
-                        </span>
-                      )}
+                      <div className="text-right flex-shrink-0 ml-3">
+                        {product.discountPrice ? (
+                          <>
+                            <div className="text-xs font-bold text-[#7A2E2E]">{product.discountPrice}</div>
+                            <div className="text-[9px] line-through text-[#AAAAAA]">{product.originalPrice}</div>
+                          </>
+                        ) : product.originalPrice ? (
+                          <div className="text-xs font-semibold text-[#7A2E2E] bg-white px-2 py-1 border border-[#E2E2DF]">{product.originalPrice}</div>
+                        ) : null}
+                      </div>
                     </div>
 
                     {/* Image Area */}
-                    <div className="aspect-[4/3] flex items-center justify-center bg-white border border-[#E2E2DF] p-6 mb-6 overflow-hidden relative">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="max-h-[140px] w-auto object-contain transition-transform duration-500 group-hover:scale-105"
-                        loading="lazy"
-                      />
+                    <div className="aspect-[4/3] flex items-center justify-center bg-white border border-[#E2E2DF] p-6 mb-5 overflow-hidden relative">
+                      {product.images?.[0] ? (
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="max-h-[140px] w-auto object-contain transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="text-[#CCCCCC]"><Package size={40} /></div>
+                      )}
+                      {/* Stock status pill */}
+                      <div className={`absolute bottom-2 right-2 text-[8px] font-bold uppercase px-1.5 py-0.5 ${
+                        product.stockStatus === "In Stock"
+                          ? "bg-green-50 text-green-700 border border-green-200"
+                          : product.stockStatus === "Limited Stock"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : "bg-red-50 text-red-700 border border-red-200"
+                      }`}>
+                        {product.stockStatus}
+                      </div>
                     </div>
 
-                    {/* Description & Specifications */}
-                    <div className="space-y-4">
+                    {/* Description & Specs */}
+                    <div className="space-y-3 flex-1">
                       <p className="text-xs text-[#666666] leading-relaxed line-clamp-2">
                         {product.description}
                       </p>
-                      
-                      {/* Technical Specs tags */}
-                      <div className="flex flex-wrap gap-1.5 pt-2">
+
+                      <div className="flex flex-wrap gap-1.5">
                         {product.specifications.slice(0, 2).map((spec, i) => (
                           <span
                             key={i}
@@ -324,10 +351,23 @@ function ProductsCatalog() {
                           </span>
                         ))}
                       </div>
+
+                      {/* Offer hints */}
+                      <div className="flex flex-wrap gap-1">
+                        {product.emiAvailable && (
+                          <span className="text-[8px] bg-teal-50 border border-teal-200 text-teal-800 px-1.5 py-0.5 font-bold uppercase">💳 EMI</span>
+                        )}
+                        {product.freeGift && (
+                          <span className="text-[8px] bg-green-50 border border-green-200 text-green-800 px-1.5 py-0.5 font-bold uppercase">🎁 Gift</span>
+                        )}
+                        {product.warranty && (
+                          <span className="text-[8px] bg-[#F8F8F6] border border-[#E2E2DF] text-[#666666] px-1.5 py-0.5 uppercase">🛡️ Warranty</span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* WhatsApp Action Button */}
-                    <div className="mt-8 pt-4 border-t border-[#E2E2DF]">
+                    {/* WhatsApp Button */}
+                    <div className="mt-6 pt-4 border-t border-[#E2E2DF]">
                       <a
                         href={getWhatsAppLink(product)}
                         target="_blank"

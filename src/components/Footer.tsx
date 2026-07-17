@@ -3,14 +3,19 @@ import Link from "next/link";
 import Logo from "./Logo";
 import { Phone, MessageSquare, ShieldCheck, MapPin } from "lucide-react";
 import { fetchSiteContent } from "@/lib/apiClient";
+import { STATIC_CONTENT } from "@/data/siteContent";
 
-// Footer fetches live from Supabase (Server Component)
+// Footer fetches live dynamic data from Supabase (Server Component).
+// Static text (businessName, address, ownerName, tagline) comes from STATIC_CONTENT.
 export default async function Footer() {
   const sc = await fetchSiteContent();
   const currentYear = new Date().getFullYear();
 
+  // Build category links from admin-defined categories
+  const sortedCategories = [...sc.categories].sort((a, b) => a.sortOrder - b.sortOrder);
+
   return (
-    <footer className="bg-[#F8F8F6] border-t border-border mt-auto pt-20 pb-10">
+    <footer className="bg-[#F8F8F6] border-t border-[#E2E2DF] mt-auto pt-20 pb-10">
       <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">
 
         {/* Brand Column */}
@@ -19,7 +24,7 @@ export default async function Footer() {
             <Logo size="md" />
           </Link>
           <p className="text-[#666666] text-sm leading-relaxed max-w-sm" id="footer-tagline">
-            {sc.footerTagline}
+            {STATIC_CONTENT.footerTagline}
           </p>
           <div className="flex items-center gap-3 text-[#8A6A44] text-xs font-semibold uppercase tracking-wider mt-2">
             <ShieldCheck size={16} />
@@ -46,17 +51,24 @@ export default async function Footer() {
           </ul>
         </div>
 
-        {/* Categories */}
+        {/* Categories (dynamic from admin) */}
         <div className="md:col-span-2 flex flex-col gap-5">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#222222]">Categories</h4>
           <ul className="flex flex-col gap-3">
-            {["Smartphones", "Accessories", "Audio", "Smart Watches", "Home Appliances"].map((cat) => (
-              <li key={cat}>
-                <Link href={`/products?category=${encodeURIComponent(cat)}`} className="text-sm text-[#666666] hover:text-[#7A2E2E] transition-colors">
-                  {cat}
-                </Link>
-              </li>
-            ))}
+            {sortedCategories.length === 0 ? (
+              <li className="text-sm text-[#999999] italic">No categories yet</li>
+            ) : (
+              sortedCategories.map((cat) => (
+                <li key={cat.id}>
+                  <Link
+                    href={cat.name === "Accessories" ? "/accessories" : `/products?category=${encodeURIComponent(cat.name)}`}
+                    className="text-sm text-[#666666] hover:text-[#7A2E2E] transition-colors"
+                  >
+                    {cat.name}
+                  </Link>
+                </li>
+              ))
+            )}
           </ul>
         </div>
 
@@ -67,8 +79,8 @@ export default async function Footer() {
             <li className="flex items-start gap-3">
               <MapPin size={18} className="text-[#8A6A44] flex-shrink-0 mt-0.5" />
               <div className="text-sm text-[#666666] leading-snug">
-                <strong>{sc.businessName}</strong><br />
-                {sc.address}
+                <strong>{STATIC_CONTENT.businessName}</strong><br />
+                {STATIC_CONTENT.address}
               </div>
             </li>
             <li className="flex items-center gap-3">
@@ -88,12 +100,12 @@ export default async function Footer() {
 
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 md:px-12 mt-16 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-6 md:px-12 mt-16 pt-8 border-t border-[#E2E2DF] flex flex-col sm:flex-row items-center justify-between gap-4">
         <p className="text-xs text-[#666666] tracking-wide text-center sm:text-left">
-          © {currentYear} {sc.businessName}. Designed with dedication. All Rights Reserved.
+          © {currentYear} {STATIC_CONTENT.businessName}. Designed with dedication. All Rights Reserved.
         </p>
         <p className="text-xs text-[#8A6A44] tracking-wider uppercase font-semibold text-center sm:text-right">
-          Managed by {sc.ownerName}
+          Managed by {STATIC_CONTENT.ownerName}
         </p>
       </div>
     </footer>

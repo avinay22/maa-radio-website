@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/products
-// Returns the current products list (from file or defaults).
+// Returns the current products list.
 // Public — no auth required.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function GET() {
@@ -20,13 +20,24 @@ export async function GET() {
       id: d.id,
       name: d.name,
       brand: d.brand,
-      category: d.category as any,
-      price: d.price || undefined,
-      image: d.image || "",
+      category: d.category,
       description: d.description || "",
+      images: d.images || (d.image ? [d.image] : []),
+      specifications: d.specifications || [],
+      originalPrice: d.original_price || d.price || "",
+      discountPrice: d.discount_price || undefined,
+      discountPercentage: d.discount_percentage || undefined,
       featured: d.featured || false,
+      newArrival: d.new_arrival || false,
+      bestSeller: d.best_seller || false,
+      stockStatus: d.stock_status || "In Stock",
+      warranty: d.warranty || undefined,
+      emiAvailable: d.emi_available || false,
+      freeGift: d.free_gift || undefined,
+      comboOffer: d.combo_offer || undefined,
+      cashbackOffer: d.cashback_offer || undefined,
+      offersAndPromotions: d.offers_and_promotions || undefined,
       isAccessoryPageOnly: d.is_accessory_page_only || false,
-      specifications: d.specifications || []
     }));
 
     return NextResponse.json(products, { status: 200 });
@@ -40,16 +51,29 @@ export async function GET() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/products
-// Writes a new products list to the server-side JSON file.
+// Writes a new products list to Supabase.
 // Requires a valid admin session token in the Authorization header.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    // Validate the session token — must be present and valid in Supabase Auth
     const authHeader = request.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "").trim();
     if (!token) {
       return NextResponse.json(
         { error: "Unauthorized. Please log in." },
+        { status: 401 }
+      );
+    }
+
+    const supabaseAnon = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data: { user }, error: authError } = await supabaseAnon.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized. Session is invalid or expired." },
         { status: 401 }
       );
     }
@@ -67,7 +91,10 @@ export async function POST(request: NextRequest) {
     
     const currentIds = body.map(p => p.id);
     if (currentIds.length > 0) {
-      await supabase.from('products').delete().not('id', 'in', `(${currentIds.join(',')})`);
+      // In Supabase, if ID has special chars or commas we format it carefully.
+      // We delete any products no longer present.
+      const { error: delError } = await supabase.from('products').delete().not('id', 'in', `(${currentIds.map(id => `"${id}"`).join(',')})`);
+      if (delError) console.error("Error deleting old products:", delError);
     } else {
       await supabase.from('products').delete().neq('id', 'dummy'); 
     }
@@ -78,12 +105,23 @@ export async function POST(request: NextRequest) {
         name: p.name,
         brand: p.brand,
         category: p.category,
-        price: p.price,
-        image: p.image,
         description: p.description,
+        images: p.images || [],
+        specifications: p.specifications || [],
+        original_price: p.originalPrice || "",
+        discount_price: p.discountPrice || null,
+        discount_percentage: p.discountPercentage || null,
         featured: p.featured || false,
+        new_arrival: p.newArrival || false,
+        best_seller: p.bestSeller || false,
+        stock_status: p.stockStatus || "In Stock",
+        warranty: p.warranty || null,
+        emi_available: p.emiAvailable || false,
+        free_gift: p.freeGift || null,
+        combo_offer: p.comboOffer || null,
+        cashback_offer: p.cashbackOffer || null,
+        offers_and_promotions: p.offersAndPromotions || null,
         is_accessory_page_only: p.isAccessoryPageOnly || false,
-        specifications: p.specifications
       }));
   
       const res = await supabase.from('products').upsert(toUpsert);
@@ -99,3 +137,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

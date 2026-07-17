@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { MessageSquare, ShieldCheck, Zap, Layers, Cpu } from "lucide-react";
+import { MessageSquare, ShieldCheck, Zap, Layers, Cpu, Package } from "lucide-react";
 import { Product } from "@/data/products";
-import { fetchProducts } from "@/lib/apiClient";
+import { SiteContent, DEFAULT_SITE_CONTENT, STATIC_CONTENT } from "@/data/siteContent";
+import { fetchProducts, fetchSiteContent } from "@/lib/apiClient";
 
 export default function AccessoriesPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [sc, setSc] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
 
   useEffect(() => {
     fetchProducts().then((allProducts) => {
@@ -15,21 +17,22 @@ export default function AccessoriesPage() {
       );
       setProducts(accessories);
     });
+    fetchSiteContent().then(setSc);
   }, []);
 
   const getWhatsAppLink = (product: Product) => {
     const text = encodeURIComponent(
-      `Hi Tushar, I am looking to purchase the accessory: ${product.brand} ${product.name}. Is it currently in stock at Maa Radio?`
+      `Hi ${STATIC_CONTENT.ownerName}, I am looking to purchase the accessory: ${product.brand} ${product.name}. Is it currently in stock at Maa Radio?`
     );
-    return `https://wa.me/917002733658?text=${text}`;
+    return `https://wa.me/${sc.whatsapp || "917002733658"}?text=${text}`;
   };
 
   return (
     <div className="bg-white pt-28 pb-20 min-h-screen">
       <div className="max-w-7xl mx-auto px-6 md:px-12">
-        
+
         {/* Editorial Page Header */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 border-b border-border pb-12 mb-16 items-end">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 border-b border-[#E2E2DF] pb-12 mb-16 items-end">
           <div className="lg:col-span-7">
             <span className="text-[10px] font-bold tracking-widest text-[#8A6A44] uppercase">
               Curated Essentials
@@ -38,7 +41,7 @@ export default function AccessoriesPage() {
               Premium Accessories
             </h1>
             <p className="text-[#666666] text-base mt-4 max-w-xl leading-relaxed">
-              Don't compromise your flagship devices with substandard peripherals. Maa Radio offers a hand-selected collection of chargers, cases, and premium cables certified for safety and maximum efficiency.
+              Don&apos;t compromise your flagship devices with substandard peripherals. Maa Radio offers a hand-selected collection of chargers, cases, and premium cables certified for safety and maximum efficiency.
             </p>
           </div>
           <div className="lg:col-span-5 flex flex-col items-start lg:items-end gap-3">
@@ -48,12 +51,12 @@ export default function AccessoriesPage() {
             </div>
             <div className="flex items-center gap-2 text-xs font-semibold text-[#8A6A44] uppercase tracking-wider">
               <Zap size={16} />
-              <span>Safe GaN & PD Fast Charging</span>
+              <span>Safe GaN &amp; PD Fast Charging</span>
             </div>
           </div>
         </div>
 
-        {/* Informative Editorial Block (Asymmetric) */}
+        {/* Editorial Info Block */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-[#F8F8F6] border border-[#E2E2DF] p-8 md:p-12 mb-16">
           <div className="space-y-3">
             <div className="text-[#7A2E2E]"><Cpu size={24} /></div>
@@ -81,7 +84,8 @@ export default function AccessoriesPage() {
         {/* Accessories Product Grid */}
         {products.length === 0 ? (
           <div className="text-center py-20 bg-[#F8F8F6] border border-[#E2E2DF]">
-            <p className="text-[#666666] text-sm">No accessories are currently loaded in the database.</p>
+            <Package size={40} className="mx-auto text-[#CCCCCC] mb-4" />
+            <p className="text-[#666666] text-sm">No accessories in the catalogue yet. Add products with the &quot;Accessories&quot; category from the Admin Panel.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -96,11 +100,14 @@ export default function AccessoriesPage() {
                     <span className="text-[9px] font-bold text-[#8A6A44] uppercase tracking-wider">
                       {item.brand}
                     </span>
-                    {item.price && (
-                      <span className="text-xs font-semibold text-[#7A2E2E]">
-                        {item.price}
-                      </span>
-                    )}
+                    {item.discountPrice ? (
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-[#7A2E2E]">{item.discountPrice}</div>
+                        <div className="text-[9px] line-through text-[#AAAAAA]">{item.originalPrice}</div>
+                      </div>
+                    ) : item.originalPrice ? (
+                      <span className="text-xs font-semibold text-[#7A2E2E]">{item.originalPrice}</span>
+                    ) : null}
                   </div>
 
                   {/* Name */}
@@ -110,21 +117,38 @@ export default function AccessoriesPage() {
 
                   {/* Image */}
                   <div className="aspect-square bg-white border border-[#E2E2DF] p-6 mb-6 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="max-h-[140px] w-auto object-contain group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                    />
+                    {item.images?.[0] ? (
+                      <img
+                        src={item.images[0]}
+                        alt={item.name}
+                        className="max-h-[140px] w-auto object-contain group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="text-[#CCCCCC]"><Package size={40} /></div>
+                    )}
+                  </div>
+
+                  {/* Badges */}
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {item.emiAvailable && (
+                      <span className="text-[8px] bg-teal-50 border border-teal-200 text-teal-800 px-1.5 py-0.5 font-bold uppercase">EMI</span>
+                    )}
+                    {item.freeGift && (
+                      <span className="text-[8px] bg-green-50 border border-green-200 text-green-800 px-1.5 py-0.5 font-bold uppercase">Free Gift</span>
+                    )}
+                    {item.warranty && (
+                      <span className="text-[8px] bg-[#F8F8F6] border border-[#E2E2DF] text-[#666666] px-1.5 py-0.5 uppercase">Warranty</span>
+                    )}
                   </div>
 
                   {/* Specs & Description */}
                   <p className="text-xs text-[#666666] leading-relaxed line-clamp-2 mb-4">
                     {item.description}
                   </p>
-                  
+
                   <div className="flex flex-wrap gap-1 mb-4">
-                    {item.specifications.map((spec, index) => (
+                    {item.specifications.slice(0, 3).map((spec, index) => (
                       <span
                         key={index}
                         className="text-[8px] bg-white border border-[#E2E2DF] text-[#666666] px-1.5 py-0.5 uppercase tracking-wide"
@@ -135,7 +159,7 @@ export default function AccessoriesPage() {
                   </div>
                 </div>
 
-                {/* WhatsApp Trigger */}
+                {/* WhatsApp Button */}
                 <div className="pt-4 border-t border-[#E2E2DF] mt-4">
                   <a
                     href={getWhatsAppLink(item)}
@@ -144,7 +168,7 @@ export default function AccessoriesPage() {
                     className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-[#7A2E2E] hover:bg-[#5F2222] text-white text-xs font-bold uppercase tracking-wider transition-colors"
                   >
                     <MessageSquare size={12} />
-                    WhatsApp Check
+                    WhatsApp Enquiry
                   </a>
                 </div>
               </div>

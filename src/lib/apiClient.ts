@@ -1,5 +1,5 @@
 import { SiteContent, DEFAULT_SITE_CONTENT } from "@/data/siteContent";
-import { Product, INITIAL_PRODUCTS } from "@/data/products";
+import { Product } from "@/data/products";
 import { createClient } from "@/lib/supabase/client";
 
 // ── Site Content ─────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ export async function fetchSiteContent(): Promise<SiteContent> {
 }
 
 // Admin write: goes through the server API route which uses the Service Role Key.
-// The token (issued by /api/admin/auth) authorises the request.
+// The token is a Supabase Auth JWT (from supabase.auth.signInWithPassword on the client).
 
 export async function saveSiteContentApi(
   content: SiteContent,
@@ -54,26 +54,38 @@ export async function fetchProducts(): Promise<Product[]> {
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
-    if (error || !data || data.length === 0) return INITIAL_PRODUCTS;
+    if (error || !data || data.length === 0) return [];
 
     return data.map((d: any) => ({
       id: d.id,
       name: d.name,
       brand: d.brand,
-      category: d.category as any,
-      price: d.price || undefined,
-      image: d.image || "",
+      category: d.category,
       description: d.description || "",
-      featured: d.featured || false,
-      isAccessoryPageOnly: d.is_accessory_page_only || false,
+      images: d.images || (d.image ? [d.image] : []),
       specifications: d.specifications || [],
+      originalPrice: d.original_price || d.price || "",
+      discountPrice: d.discount_price || undefined,
+      discountPercentage: d.discount_percentage || undefined,
+      featured: d.featured || false,
+      newArrival: d.new_arrival || false,
+      bestSeller: d.best_seller || false,
+      stockStatus: d.stock_status || "In Stock",
+      warranty: d.warranty || undefined,
+      emiAvailable: d.emi_available || false,
+      freeGift: d.free_gift || undefined,
+      comboOffer: d.combo_offer || undefined,
+      cashbackOffer: d.cashback_offer || undefined,
+      offersAndPromotions: d.offers_and_promotions || undefined,
+      isAccessoryPageOnly: d.is_accessory_page_only || false,
     }));
   } catch {
-    return INITIAL_PRODUCTS;
+    return [];
   }
 }
 
 // Admin write: goes through the server API route which uses the Service Role Key.
+// The token is a Supabase Auth JWT (from supabase.auth.signInWithPassword on the client).
 
 export async function saveProductsApi(
   products: Product[],
@@ -95,3 +107,4 @@ export async function saveProductsApi(
     return { ok: false, error: "Network error. Please try again." };
   }
 }
+
