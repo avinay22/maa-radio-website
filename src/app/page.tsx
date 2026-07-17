@@ -622,7 +622,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {sortedGallery.map((item) => (
                 <motion.div key={item.id} whileHover={{ scale: 1.02 }} transition={{ duration: 0.3 }} className="relative aspect-square border border-[#E2E2DF] bg-[#F8F8F6] overflow-hidden group">
-                  <img src={item.imageUrl} alt={item.category} className="w-full h-full object-cover filter grayscale hover:grayscale-0 transition-all duration-500" loading="lazy" />
+                  <img src={item.imageUrl} alt={item.category} className="w-full h-full object-cover transition-all duration-500" loading="lazy" />
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent py-3 px-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                     <span className="text-[8px] text-white font-bold uppercase tracking-wide">{item.category}</span>
                   </div>
