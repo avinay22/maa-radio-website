@@ -12,10 +12,42 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Maa Radio | Premium Electronics & Mobiles Store",
-  description: "Maa Radio is your trusted premium electronics, smartphones, custom accessories, and home appliances store owned by Tushar Ghosh. Handcrafted premium products and direct support.",
-  keywords: ["Maa Radio", "Tushar Ghosh", "Mobiles Maa Radio", "Premium Mobiles", "Maa Radio Electronics", "Smartphones Store", "Home Appliances", "Accessories Catalog"],
-  authors: [{ name: "Tushar Ghosh" }],
+  title: "Maa Radio Mart | Mobile & Electronics Store in Gogamukh, Assam",
+
+  description:
+    "Maa Radio Mart is a trusted mobile and electronics store in Gogamukh, Assam. Explore genuine smartphones, laptops, mobile accessories, smart gadgets, audio products, and home appliances from leading brands at competitive prices with reliable customer service.",
+
+  keywords: [
+    "Maa Radio Mart",
+    "Maa Radio Gogamukh",
+    "Mobile Shop Gogamukh",
+    "Electronics Store Gogamukh",
+    "Best Mobile Shop Gogamukh",
+    "Mobile Store Gogamukh",
+    "Electronics Shop Gogamukh",
+    "Mobile Shop Dhemaji",
+    "Electronics Store Dhemaji",
+    "Mobile Store Assam",
+    "Electronics Store Assam",
+    "Smartphones",
+    "Laptops",
+    "Mobile Accessories",
+    "Smart Watches",
+    "Bluetooth Speakers",
+    "Home Appliances",
+    "Vivo Mobile Gogamukh",
+    "OPPO Mobile Gogamukh",
+    "Samsung Mobile Gogamukh",
+    "Realme Mobile Gogamukh",
+    "Xiaomi Mobile Gogamukh",
+    "iPhone Gogamukh",
+  ],
+
+  authors: [{ name: "Maa Radio Mart" }],
+
+  verification: {
+    google: "YlDXy8gNV3skF_95y0dRHPwFiFVLYrGrpAPOJcJPtgE",
+  },
 };
 
 export const viewport: Viewport = {
