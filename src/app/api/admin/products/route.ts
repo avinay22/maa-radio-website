@@ -2,8 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { Product } from "@/data/products";
 import { createClient } from "@supabase/supabase-js";
 
+function mapProductToRow(p: Product) {
+  return {
+    id: p.id || crypto.randomUUID(),
+    name: p.name,
+    brand: p.brand,
+    category: p.category,
+    description: p.description || "",
+    images: p.images || [],
+    specifications: p.specifications || [],
+    original_price: p.originalPrice || "",
+    discount_price: p.discountPrice || null,
+    discount_percentage: p.discountPercentage || null,
+    featured: p.featured || false,
+    new_arrival: p.newArrival || false,
+    best_seller: p.bestSeller || false,
+    stock_status: p.stockStatus || "In Stock",
+    warranty: p.warranty || null,
+    emi_available: p.emiAvailable || false,
+    free_gift: p.freeGift || null,
+    combo_offer: p.comboOffer || null,
+    cashback_offer: p.cashbackOffer || null,
+    offers_and_promotions: p.offersAndPromotions || null,
+    is_accessory_page_only: p.isAccessoryPageOnly || false,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 // ─────────────────────────────────────────
 // GET /api/admin/products
+// Fetch all products directly from Supabase
 // ─────────────────────────────────────────
 export async function GET() {
   try {
@@ -19,15 +47,15 @@ export async function GET() {
 
     if (error) throw new Error(error.message);
 
-    const products = (data || []).map((d: any) => ({
+    const products: Product[] = (data || []).map((d: any) => ({
       id: d.id,
       name: d.name,
       brand: d.brand,
       category: d.category,
       description: d.description || "",
-      images: d.images || [],
+      images: d.images || (d.image ? [d.image] : []),
       specifications: d.specifications || [],
-      originalPrice: d.original_price || "",
+      originalPrice: d.original_price || d.price || "",
       discountPrice: d.discount_price || undefined,
       discountPercentage: d.discount_percentage || undefined,
       featured: d.featured || false,
@@ -44,10 +72,10 @@ export async function GET() {
     }));
 
     return NextResponse.json(products, { status: 200 });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[GET PRODUCTS ERROR]", err);
     return NextResponse.json(
-      { error: "Failed to fetch products" },
+      { error: err?.message || "Failed to fetch products" },
       { status: 500 }
     );
   }
@@ -55,7 +83,7 @@ export async function GET() {
 
 // ─────────────────────────────────────────
 // POST /api/admin/products
-// SAVE SINGLE PRODUCT (FIXED)
+// Upsert product(s) directly to Supabase
 // ─────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
@@ -85,52 +113,96 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✅ RECEIVE SINGLE PRODUCT
-    const body = await request.json() as Product;
-
-    // ❌ REMOVE ARRAY CHECK (IMPORTANT)
-    // no Array.isArray
-    // no map
-    // no length
+    const body = await request.json();
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // ✅ SAVE PRODUCT
-    const { error } = await supabase.from("products").upsert({
-      id: body.id || crypto.randomUUID(),  // 🔥 CRITICAL FIX
-      name: body.name,
-      brand: body.brand,
-      category: body.category,
-      description: body.description,
-      images: body.images || [],
-      specifications: body.specifications || [],
-      original_price: body.originalPrice || "",
-      discount_price: body.discountPrice || null,
-      discount_percentage: body.discountPercentage || null,
-      featured: body.featured || false,
-      new_arrival: body.newArrival || false,
-      best_seller: body.bestSeller || false,
-      stock_status: body.stockStatus || "In Stock",
-      warranty: body.warranty || null,
-      emi_available: body.emiAvailable || false,
-      free_gift: body.freeGift || null,
-      combo_offer: body.comboOffer || null,
-      cashback_offer: body.cashbackOffer || null,
-      offers_and_promotions: body.offersAndPromotions || null,
-      is_accessory_page_only: body.isAccessoryPageOnly || false,
-    });
+    if (Array.isArray(body)) {
+      const rows = body.map(mapProductToRow);
+      const { error } = await supabase.from("products").upsert(rows);
+      if (error) throw new Error(error.message);
+    } else {
+      const row = mapProductToRow(body);
+      const { error } = await supabase.from("products").upsert(row);
+      if (error) throw new Error(error.message);
+    }
 
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (err: any) {
+    console.error("[POST PRODUCTS ERROR]", err);
+    return NextResponse.json(
+      { error: err?.message || "Failed to save product" },
+      { status: 500 }
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// DELETE /api/admin/products
+// Delete product directly from Supabase by ID
+// ─────────────────────────────────────────
+export async function DELETE(request: NextRequest) {
+  try {
+    // 🔐 AUTH CHECK
+    const authHeader = request.headers.get("Authorization") ?? "";
+    const token = authHeader.replace("Bearer ", "").trim();
+
+    if (!token) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const supabaseAnon = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const { data: { user }, error: authError } =
+      await supabaseAnon.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Invalid session" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get("id");
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = body?.id;
+      } catch {
+        // body may not be JSON
+      }
+    }
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Product ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error } = await supabase.from("products").delete().eq("id", id);
     if (error) throw new Error(error.message);
 
     return NextResponse.json({ ok: true }, { status: 200 });
-
-  } catch (err) {
-    console.error("[POST PRODUCTS ERROR]", err);
+  } catch (err: any) {
+    console.error("[DELETE PRODUCT ERROR]", err);
     return NextResponse.json(
-      { error: "Failed to save product" },
+      { error: err?.message || "Failed to delete product" },
       { status: 500 }
     );
   }

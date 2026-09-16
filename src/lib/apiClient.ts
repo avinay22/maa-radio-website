@@ -87,8 +87,48 @@ export async function fetchProducts(): Promise<Product[]> {
 // Admin write: goes through the server API route which uses the Service Role Key.
 // The token is a Supabase Auth JWT (from supabase.auth.signInWithPassword on the client).
 
+export async function saveProductApi(
+  product: Product,
+  token: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/products", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(product),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error ?? "Save failed." };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error. Please try again." };
+  }
+}
+
+export async function deleteProductApi(
+  id: string,
+  token: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/admin/products?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error ?? "Delete failed." };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error. Please try again." };
+  }
+}
+
 export async function saveProductsApi(
-  products: Product[],
+  products: Product[] | Product,
   token: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {

@@ -11,7 +11,7 @@ import { Product } from "@/data/products";
 import ImageUploader from "@/components/ImageUploader";
 import {
   fetchSiteContent, saveSiteContentApi,
-  fetchProducts, saveProductsApi,
+  fetchProducts, saveProductApi, deleteProductApi,
 } from "@/lib/apiClient";
 import { createClient } from "@/lib/supabase/client";
 
@@ -798,26 +798,18 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
       isAccessoryPageOnly: isAccessoryOnly,
     };
 
-    let updated: Product[];
-    if (editingId) {
-      updated = products.map((p) => (p.id === editingId ? productData : p));
-    } else {
-      updated = [productData, ...products];
-    }
-
-    setProducts(updated);
     setSaving(true);
     setSaveError("");
-    const result = await saveProductsApi(updated, token);
+    const result = await saveProductApi(productData, token);
     setSaving(false);
 
     if (result.ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
       resetForm();
+      await refreshProducts();
     } else {
-      setSaveError(result.error ?? "Failed to save product to server.");
-      refreshProducts();
+      setSaveError(result.error ?? "Failed to save product to Supabase.");
     }
   };
 
@@ -871,21 +863,19 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
 
   const handleDelete = async (id: string, label: string) => {
     if (!window.confirm(`Remove "${label}" from inventory?`)) return;
-    const updated = products.filter((p) => p.id !== id);
-    setProducts(updated);
 
     setSaving(true);
     setSaveError("");
-    const result = await saveProductsApi(updated, token);
+    const result = await deleteProductApi(id, token);
     setSaving(false);
 
     if (result.ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
       if (editingId === id) resetForm();
+      await refreshProducts();
     } else {
-      setSaveError(result.error ?? "Failed to delete product from server.");
-      refreshProducts();
+      setSaveError(result.error ?? "Failed to delete product from Supabase.");
     }
   };
 
