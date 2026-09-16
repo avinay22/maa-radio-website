@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { Product } from "@/data/products";
 import { createClient } from "@supabase/supabase-js";
 
+function cleanProductId(id?: string | number): string | number {
+  if (!id) return Date.now();
+  if (typeof id === "number") return id;
+  const digitsOnly = String(id).replace(/\D/g, "");
+  if (digitsOnly.length > 0 && digitsOnly.length <= 15) {
+    return parseInt(digitsOnly, 10);
+  }
+  return id;
+}
+
 function mapProductToRow(p: Product) {
   return {
-    id: p.id || crypto.randomUUID(),
+    id: cleanProductId(p.id),
     name: p.name,
     brand: p.brand,
     category: p.category,
@@ -34,9 +44,36 @@ async function upsertWithFallback(supabaseClient: any, data: any) {
     ? data.map((r: any) => ({ ...r }))
     : { ...data };
 
-  for (let attempt = 0; attempt < 20; attempt++) {
+  for (let attempt = 0; attempt < 25; attempt++) {
     const { error } = await supabaseClient.from("products").upsert(currentData);
     if (!error) return;
+
+    // Handle bigint input syntax error: convert ID to numeric
+    if (error.message?.includes("invalid input syntax for type bigint")) {
+      if (Array.isArray(currentData)) {
+        currentData.forEach((row: any) => {
+          const digits = String(row.id || "").replace(/\D/g, "");
+          row.id = digits ? parseInt(digits, 10) : Date.now();
+        });
+      } else {
+        const digits = String(currentData.id || "").replace(/\D/g, "");
+        currentData.id = digits ? parseInt(digits, 10) : Date.now();
+      }
+      continue;
+    }
+
+    // Handle auto-generated identity column error
+    if (
+      error.message?.includes("identity column") ||
+      error.message?.includes("generated always")
+    ) {
+      if (Array.isArray(currentData)) {
+        currentData.forEach((row: any) => delete row.id);
+      } else {
+        delete currentData.id;
+      }
+      continue;
+    }
 
     // Detect if column doesn't exist in user's Supabase schema
     const match = error.message?.match(
@@ -96,7 +133,7 @@ export async function GET() {
     if (error) throw new Error(error.message);
 
     const products: Product[] = (data || []).map((d: any) => ({
-      id: d.id,
+      id: String(d.id),
       name: d.name,
       brand: d.brand,
       category: d.category,
@@ -241,7 +278,12 @@ export async function DELETE(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    const cleanId = cleanProductId(id);
+    let { error } = await supabase.from("products").delete().eq("id", cleanId);
+    if (error && error.message?.includes("invalid input syntax for type bigint")) {
+      const res = await supabase.from("products").delete().eq("id", id);
+      error = res.error;
+    }
     if (error) throw new Error(error.message);
 
     return NextResponse.json({ ok: true }, { status: 200 });

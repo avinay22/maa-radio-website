@@ -775,7 +775,7 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
     const validImages = images.filter(Boolean);
 
     const productData: Product = {
-      id: editingId || `prod-${Date.now()}`,
+      id: editingId || String(Date.now()),
       name,
       brand,
       category,
