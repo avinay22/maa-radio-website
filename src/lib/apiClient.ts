@@ -50,10 +50,17 @@ export async function saveSiteContentApi(
 export async function fetchProducts(): Promise<Product[]> {
   try {
     const supabase = createClient();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
+
+    if (error && error.message?.includes("created_at")) {
+      const fallback = await supabase.from("products").select("*");
+      data = fallback.data;
+      error = fallback.error;
+    }
+
     if (error || !data || data.length === 0) return [];
 
     return data.map((d: any) => ({

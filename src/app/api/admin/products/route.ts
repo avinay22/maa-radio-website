@@ -29,6 +29,48 @@ function mapProductToRow(p: Product) {
   };
 }
 
+async function upsertWithFallback(supabaseClient: any, data: any) {
+  let currentData = Array.isArray(data)
+    ? data.map((r: any) => ({ ...r }))
+    : { ...data };
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const { error } = await supabaseClient.from("products").upsert(currentData);
+    if (!error) return;
+
+    // Detect if column doesn't exist in user's Supabase schema
+    const match = error.message?.match(
+      /Could not find the '([^']+)' column of 'products' in the schema cache/i
+    );
+
+    if (match && match[1]) {
+      const missingCol = match[1];
+      if (Array.isArray(currentData)) {
+        currentData.forEach((row: any) => {
+          if (missingCol === "original_price" && row.original_price && !row.price) {
+            row.price = row.original_price;
+          }
+          if (missingCol === "images" && Array.isArray(row.images) && !row.image) {
+            row.image = row.images[0] || "";
+          }
+          delete row[missingCol];
+        });
+      } else {
+        if (missingCol === "original_price" && currentData.original_price && !currentData.price) {
+          currentData.price = currentData.original_price;
+        }
+        if (missingCol === "images" && Array.isArray(currentData.images) && !currentData.image) {
+          currentData.image = currentData.images[0] || "";
+        }
+        delete currentData[missingCol];
+      }
+      continue;
+    }
+
+    throw new Error(error.message);
+  }
+}
+
 // ─────────────────────────────────────────
 // GET /api/admin/products
 // Fetch all products directly from Supabase
@@ -40,10 +82,16 @@ export async function GET() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
+
+    if (error && error.message?.includes("created_at")) {
+      const fallback = await supabase.from("products").select("*");
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw new Error(error.message);
 
@@ -122,12 +170,10 @@ export async function POST(request: NextRequest) {
 
     if (Array.isArray(body)) {
       const rows = body.map(mapProductToRow);
-      const { error } = await supabase.from("products").upsert(rows);
-      if (error) throw new Error(error.message);
+      await upsertWithFallback(supabase, rows);
     } else {
       const row = mapProductToRow(body);
-      const { error } = await supabase.from("products").upsert(row);
-      if (error) throw new Error(error.message);
+      await upsertWithFallback(supabase, row);
     }
 
     return NextResponse.json({ ok: true }, { status: 200 });
