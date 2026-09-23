@@ -55,7 +55,9 @@ export default function HomePage() {
     : whatsappLink;
 
   const featuredProducts = products.filter((p) => p.featured);
-  const newArrivals = [...products].sort((a, b) => b.id.localeCompare(a.id));
+  const newArrivals = [...products].sort((a, b) =>
+    String(b.id || "").localeCompare(String(a.id || ""))
+  );
 
   // Sorted categories from admin panel
   const sortedCategories = [...sc.categories].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -456,7 +458,7 @@ export default function HomePage() {
                   </p>
 
                   <div className="flex flex-wrap gap-1">
-                    {product.specifications.slice(0, 2).map((spec, index) => (
+                    {(product.specifications || []).slice(0, 2).map((spec, index) => (
                       <span
                         key={index}
                         className="text-[8px] bg-white border border-[#E2E2DF] text-[#666666] px-1.5 py-0.5 uppercase tracking-wide"

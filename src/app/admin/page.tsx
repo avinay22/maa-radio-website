@@ -774,8 +774,8 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
     const specsArray = specifications.split(",").map((s) => s.trim()).filter(Boolean);
     const validImages = images.filter(Boolean);
 
-    const productData: Product = {
-      id: editingId || String(Date.now()),
+    const productData: any = {
+      ...(editingId ? { id: editingId } : {}),
       name,
       brand,
       category,
@@ -838,22 +838,22 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
   };
 
   const startEdit = (p: Product) => {
-    setEditingId(p.id);
-    setName(p.name);
-    setBrand(p.brand);
-    setCategory(p.category);
-    setDescription(p.description);
-    setImages(p.images || []);
-    setSpecifications(p.specifications.join(", "));
-    setOriginalPrice(p.originalPrice);
+    setEditingId(String(p.id));
+    setName(p.name || "");
+    setBrand(p.brand || "");
+    setCategory(p.category || categories[0]?.name || "");
+    setDescription(p.description || "");
+    setImages(Array.isArray(p.images) ? p.images : []);
+    setSpecifications(Array.isArray(p.specifications) ? p.specifications.join(", ") : "");
+    setOriginalPrice(p.originalPrice || "");
     setDiscountPrice(p.discountPrice || "");
     setDiscountPercentage(p.discountPercentage || "");
-    setFeatured(p.featured);
-    setNewArrival(p.newArrival);
-    setBestSeller(p.bestSeller);
-    setStockStatus(p.stockStatus);
+    setFeatured(Boolean(p.featured));
+    setNewArrival(Boolean(p.newArrival));
+    setBestSeller(Boolean(p.bestSeller));
+    setStockStatus(p.stockStatus || "In Stock");
     setWarranty(p.warranty || "");
-    setEmiAvailable(p.emiAvailable);
+    setEmiAvailable(Boolean(p.emiAvailable));
     setFreeGift(p.freeGift || "");
     setComboOffer(p.comboOffer || "");
     setCashbackOffer(p.cashbackOffer || "");
@@ -866,13 +866,13 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
 
     setSaving(true);
     setSaveError("");
-    const result = await deleteProductApi(id, token);
+    const result = await deleteProductApi(String(id), token);
     setSaving(false);
 
     if (result.ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-      if (editingId === id) resetForm();
+      if (editingId === String(id)) resetForm();
       await refreshProducts();
     } else {
       setSaveError(result.error ?? "Failed to delete product from Supabase.");

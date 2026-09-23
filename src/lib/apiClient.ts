@@ -45,59 +45,63 @@ export async function saveSiteContentApi(
 }
 
 // ── Products ─────────────────────────────────────────────────────────────────
-// Public read
+// Supabase is the ONLY source of truth via /api/admin/products.
+// Public read: calls /api/admin/products (no fallback to local data)
 
 export async function fetchProducts(): Promise<Product[]> {
   try {
-    const supabase = createClient();
-    let { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error && error.message?.includes("created_at")) {
-      const fallback = await supabase.from("products").select("*");
-      data = fallback.data;
-      error = fallback.error;
+    const res = await fetch("/api/admin/products", {
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      console.error("[fetchProducts] API returned status", res.status);
+      return [];
     }
-
-    if (error || !data || data.length === 0) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
 
     return data.map((d: any) => ({
-      id: d.id,
-      name: d.name,
-      brand: d.brand,
-      category: d.category,
+      id: String(d.id),
+      name: d.name || "",
+      brand: d.brand || "",
+      category: d.category || "",
       description: d.description || "",
-      images: d.images || (d.image ? [d.image] : []),
-      specifications: d.specifications || [],
-      originalPrice: d.original_price || d.price || "",
-      discountPrice: d.discount_price || undefined,
-      discountPercentage: d.discount_percentage || undefined,
-      featured: d.featured || false,
-      newArrival: d.new_arrival || false,
-      bestSeller: d.best_seller || false,
-      stockStatus: d.stock_status || "In Stock",
+      images: Array.isArray(d.images) && d.images.length > 0
+        ? d.images
+        : (d.image ? [d.image] : []),
+      specifications: Array.isArray(d.specifications)
+        ? d.specifications
+        : (typeof d.specifications === "string" && d.specifications
+            ? d.specifications.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : []),
+      originalPrice: d.originalPrice || d.original_price || (d.price ? String(d.price) : ""),
+      discountPrice: d.discountPrice || d.discount_price || undefined,
+      discountPercentage: d.discountPercentage || d.discount_percentage || undefined,
+      featured: Boolean(d.featured),
+      newArrival: Boolean(d.newArrival ?? d.new_arrival),
+      bestSeller: Boolean(d.bestSeller ?? d.best_seller),
+      stockStatus: d.stockStatus || d.stock_status || "In Stock",
       warranty: d.warranty || undefined,
-      emiAvailable: d.emi_available || false,
-      freeGift: d.free_gift || undefined,
-      comboOffer: d.combo_offer || undefined,
-      cashbackOffer: d.cashback_offer || undefined,
-      offersAndPromotions: d.offers_and_promotions || undefined,
-      isAccessoryPageOnly: d.is_accessory_page_only || false,
+      emiAvailable: Boolean(d.emiAvailable ?? d.emi_available),
+      freeGift: d.freeGift || d.free_gift || undefined,
+      comboOffer: d.comboOffer || d.combo_offer || undefined,
+      cashbackOffer: d.cashbackOffer || d.cashback_offer || undefined,
+      offersAndPromotions: d.offersAndPromotions || d.offers_and_promotions || undefined,
+      isAccessoryPageOnly: Boolean(d.isAccessoryPageOnly ?? d.is_accessory_page_only),
     }));
-  } catch {
+  } catch (err) {
+    console.error("[fetchProducts] Error fetching products:", err);
     return [];
   }
 }
 
 // Admin write: goes through the server API route which uses the Service Role Key.
-// The token is a Supabase Auth JWT (from supabase.auth.signInWithPassword on the client).
+// Sends a SINGLE product object (not array).
 
 export async function saveProductApi(
-  product: Product,
+  product: Partial<Product> & { id?: string; name: string },
   token: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; product?: any }> {
   try {
     const res = await fetch("/api/admin/products", {
       method: "POST",
@@ -109,9 +113,9 @@ export async function saveProductApi(
     });
     const data = await res.json();
     if (!res.ok) return { ok: false, error: data.error ?? "Save failed." };
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error. Please try again." };
+    return { ok: true, product: data.product };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "Network error. Please try again." };
   }
 }
 
@@ -129,29 +133,8 @@ export async function deleteProductApi(
     const data = await res.json();
     if (!res.ok) return { ok: false, error: data.error ?? "Delete failed." };
     return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error. Please try again." };
-  }
-}
-
-export async function saveProductsApi(
-  products: Product[] | Product,
-  token: string
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch("/api/admin/products", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(products),
-    });
-    const data = await res.json();
-    if (!res.ok) return { ok: false, error: data.error ?? "Save failed." };
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error. Please try again." };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "Network error. Please try again." };
   }
 }
 

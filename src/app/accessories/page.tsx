@@ -148,7 +148,7 @@ export default function AccessoriesPage() {
                   </p>
 
                   <div className="flex flex-wrap gap-1 mb-4">
-                    {item.specifications.slice(0, 3).map((spec, index) => (
+                    {(item.specifications || []).slice(0, 3).map((spec, index) => (
                       <span
                         key={index}
                         className="text-[8px] bg-white border border-[#E2E2DF] text-[#666666] px-1.5 py-0.5 uppercase tracking-wide"

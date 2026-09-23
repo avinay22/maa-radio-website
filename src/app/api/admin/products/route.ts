@@ -12,53 +12,47 @@ function cleanProductId(id?: string | number): string | number {
   return id;
 }
 
-function mapProductToRow(p: Product) {
+function mapProductToRow(p: any) {
   return {
-    id: cleanProductId(p.id),
+    id: p.id || crypto.randomUUID(),
     name: p.name,
-    brand: p.brand,
-    category: p.category,
+    brand: p.brand || "",
+    category: p.category || "",
     description: p.description || "",
-    images: p.images || [],
-    specifications: p.specifications || [],
-    original_price: p.originalPrice || "",
-    discount_price: p.discountPrice || null,
-    discount_percentage: p.discountPercentage || null,
-    featured: p.featured || false,
-    new_arrival: p.newArrival || false,
-    best_seller: p.bestSeller || false,
-    stock_status: p.stockStatus || "In Stock",
+    images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
+    specifications: Array.isArray(p.specifications) ? p.specifications : [],
+    original_price: p.originalPrice || p.original_price || "",
+    discount_price: p.discountPrice || p.discount_price || null,
+    discount_percentage: p.discountPercentage || p.discount_percentage || null,
+    featured: Boolean(p.featured),
+    new_arrival: Boolean(p.newArrival || p.new_arrival),
+    best_seller: Boolean(p.bestSeller || p.best_seller),
+    stock_status: p.stockStatus || p.stock_status || "In Stock",
     warranty: p.warranty || null,
-    emi_available: p.emiAvailable || false,
-    free_gift: p.freeGift || null,
-    combo_offer: p.comboOffer || null,
-    cashback_offer: p.cashbackOffer || null,
-    offers_and_promotions: p.offersAndPromotions || null,
-    is_accessory_page_only: p.isAccessoryPageOnly || false,
+    emi_available: Boolean(p.emiAvailable || p.emi_available),
+    free_gift: p.freeGift || p.free_gift || null,
+    combo_offer: p.comboOffer || p.combo_offer || null,
+    cashback_offer: p.cashbackOffer || p.cashback_offer || null,
+    offers_and_promotions: p.offersAndPromotions || p.offers_and_promotions || null,
+    is_accessory_page_only: Boolean(p.isAccessoryPageOnly || p.is_accessory_page_only),
     updated_at: new Date().toISOString(),
   };
 }
 
 async function upsertWithFallback(supabaseClient: any, data: any) {
-  let currentData = Array.isArray(data)
-    ? data.map((r: any) => ({ ...r }))
-    : { ...data };
+  let currentData = { ...data };
 
   for (let attempt = 0; attempt < 25; attempt++) {
     const { error } = await supabaseClient.from("products").upsert(currentData);
-    if (!error) return;
+    if (!error) return currentData;
 
-    // Handle bigint input syntax error: convert ID to numeric
-    if (error.message?.includes("invalid input syntax for type bigint")) {
-      if (Array.isArray(currentData)) {
-        currentData.forEach((row: any) => {
-          const digits = String(row.id || "").replace(/\D/g, "");
-          row.id = digits ? parseInt(digits, 10) : Date.now();
-        });
-      } else {
-        const digits = String(currentData.id || "").replace(/\D/g, "");
-        currentData.id = digits ? parseInt(digits, 10) : Date.now();
-      }
+    // Handle bigint input syntax error or out of range: convert ID to numeric
+    if (
+      error.message?.includes("invalid input syntax for type bigint") ||
+      error.message?.includes("out of range for type bigint")
+    ) {
+      const digits = String(currentData.id || "").replace(/\D/g, "");
+      currentData.id = digits && digits.length <= 15 ? parseInt(digits, 10) : Date.now();
       continue;
     }
 
@@ -67,11 +61,7 @@ async function upsertWithFallback(supabaseClient: any, data: any) {
       error.message?.includes("identity column") ||
       error.message?.includes("generated always")
     ) {
-      if (Array.isArray(currentData)) {
-        currentData.forEach((row: any) => delete row.id);
-      } else {
-        delete currentData.id;
-      }
+      delete currentData.id;
       continue;
     }
 
@@ -82,25 +72,13 @@ async function upsertWithFallback(supabaseClient: any, data: any) {
 
     if (match && match[1]) {
       const missingCol = match[1];
-      if (Array.isArray(currentData)) {
-        currentData.forEach((row: any) => {
-          if (missingCol === "original_price" && row.original_price && !row.price) {
-            row.price = row.original_price;
-          }
-          if (missingCol === "images" && Array.isArray(row.images) && !row.image) {
-            row.image = row.images[0] || "";
-          }
-          delete row[missingCol];
-        });
-      } else {
-        if (missingCol === "original_price" && currentData.original_price && !currentData.price) {
-          currentData.price = currentData.original_price;
-        }
-        if (missingCol === "images" && Array.isArray(currentData.images) && !currentData.image) {
-          currentData.image = currentData.images[0] || "";
-        }
-        delete currentData[missingCol];
+      if (missingCol === "original_price" && currentData.original_price && !currentData.price) {
+        currentData.price = currentData.original_price;
       }
+      if (missingCol === "images" && Array.isArray(currentData.images) && !currentData.image) {
+        currentData.image = currentData.images[0] || "";
+      }
+      delete currentData[missingCol];
       continue;
     }
 
@@ -116,7 +94,7 @@ export async function GET() {
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
     let { data, error } = await supabase
@@ -134,29 +112,40 @@ export async function GET() {
 
     const products: Product[] = (data || []).map((d: any) => ({
       id: String(d.id),
-      name: d.name,
-      brand: d.brand,
-      category: d.category,
+      name: d.name || "",
+      brand: d.brand || "",
+      category: d.category || "",
       description: d.description || "",
-      images: d.images || (d.image ? [d.image] : []),
-      specifications: d.specifications || [],
-      originalPrice: d.original_price || d.price || "",
+      images: Array.isArray(d.images) && d.images.length > 0
+        ? d.images
+        : (d.image ? [d.image] : []),
+      specifications: Array.isArray(d.specifications)
+        ? d.specifications
+        : (typeof d.specifications === "string" && d.specifications
+            ? d.specifications.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : []),
+      originalPrice: d.original_price || (d.price ? String(d.price) : ""),
       discountPrice: d.discount_price || undefined,
       discountPercentage: d.discount_percentage || undefined,
-      featured: d.featured || false,
-      newArrival: d.new_arrival || false,
-      bestSeller: d.best_seller || false,
+      featured: Boolean(d.featured),
+      newArrival: Boolean(d.new_arrival),
+      bestSeller: Boolean(d.best_seller),
       stockStatus: d.stock_status || "In Stock",
       warranty: d.warranty || undefined,
-      emiAvailable: d.emi_available || false,
+      emiAvailable: Boolean(d.emi_available),
       freeGift: d.free_gift || undefined,
       comboOffer: d.combo_offer || undefined,
       cashbackOffer: d.cashback_offer || undefined,
       offersAndPromotions: d.offers_and_promotions || undefined,
-      isAccessoryPageOnly: d.is_accessory_page_only || false,
+      isAccessoryPageOnly: Boolean(d.is_accessory_page_only),
     }));
 
-    return NextResponse.json(products, { status: 200 });
+    return NextResponse.json(products, {
+      status: 200,
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    });
   } catch (err: any) {
     console.error("[GET PRODUCTS ERROR]", err);
     return NextResponse.json(
@@ -168,7 +157,7 @@ export async function GET() {
 
 // ─────────────────────────────────────────
 // POST /api/admin/products
-// Upsert product(s) directly to Supabase
+// Upsert single product directly to Supabase
 // ─────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
@@ -199,21 +188,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const productPayload = Array.isArray(body) ? body[0] : body;
+
+    if (!productPayload || typeof productPayload !== "object") {
+      return NextResponse.json(
+        { error: "Expected a single product object" },
+        { status: 400 }
+      );
+    }
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    if (Array.isArray(body)) {
-      const rows = body.map(mapProductToRow);
-      await upsertWithFallback(supabase, rows);
-    } else {
-      const row = mapProductToRow(body);
-      await upsertWithFallback(supabase, row);
-    }
+    const row = mapProductToRow(productPayload);
+    const savedRow = await upsertWithFallback(supabase, row);
 
-    return NextResponse.json({ ok: true }, { status: 200 });
+    return NextResponse.json({ ok: true, product: savedRow }, { status: 200 });
   } catch (err: any) {
     console.error("[POST PRODUCTS ERROR]", err);
     return NextResponse.json(
@@ -275,7 +267,7 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
     const cleanId = cleanProductId(id);

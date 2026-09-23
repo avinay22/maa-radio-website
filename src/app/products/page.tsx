@@ -342,7 +342,7 @@ function ProductsCatalog() {
                       </p>
 
                       <div className="flex flex-wrap gap-1.5">
-                        {product.specifications.slice(0, 2).map((spec, i) => (
+                        {(product.specifications || []).slice(0, 2).map((spec, i) => (
                           <span
                             key={i}
                             className="text-[9px] text-[#666666] bg-white border border-[#E2E2DF] px-2 py-0.5 uppercase tracking-wide"
