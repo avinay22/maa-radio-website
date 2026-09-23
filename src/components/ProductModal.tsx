@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Product } from "@/data/products";
 import { STATIC_CONTENT } from "@/data/siteContent";
+import { formatPrice, getDiscountBadge } from "@/components/ProductCard";
 
 interface ProductModalProps {
   product: Product | null;
@@ -237,21 +238,21 @@ export default function ProductModal({
               <div className="p-4 bg-[#FAF9F6] border border-[#E2E2DF] rounded-xl flex items-baseline gap-3 flex-wrap">
                 {product.discountPrice ? (
                   <>
-                    <span className="text-2xl sm:text-3xl font-black text-[#7A2E2E]">
-                      {product.discountPrice}
+                    <span className="text-2xl sm:text-3xl font-black text-[#111111]">
+                      {formatPrice(product.discountPrice)}
                     </span>
                     <span className="text-sm line-through text-[#888888] font-medium">
-                      {product.originalPrice}
+                      {formatPrice(product.originalPrice)}
                     </span>
-                    {product.discountPercentage && (
-                      <span className="bg-[#7A2E2E] text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ml-auto">
-                        {product.discountPercentage} OFF
+                    {getDiscountBadge(product.originalPrice, product.discountPrice, product.discountPercentage) && (
+                      <span className="bg-[#DC2626] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md ml-auto shadow-xs">
+                        {getDiscountBadge(product.originalPrice, product.discountPrice, product.discountPercentage)}
                       </span>
                     )}
                   </>
                 ) : (
-                  <span className="text-2xl sm:text-3xl font-black text-[#7A2E2E]">
-                    {product.originalPrice || "Price on Request"}
+                  <span className="text-2xl sm:text-3xl font-black text-[#111111]">
+                    {formatPrice(product.originalPrice) || "Price on Request"}
                   </span>
                 )}
               </div>

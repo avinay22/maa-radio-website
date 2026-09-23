@@ -5,6 +5,44 @@ import { MessageSquare, Eye, Sparkles, CheckCircle, AlertCircle, Package } from 
 import { Product } from "@/data/products";
 import { STATIC_CONTENT } from "@/data/siteContent";
 
+/**
+ * Formats any price input into Indian Currency format (e.g. ₹16,499)
+ */
+export function formatPrice(price?: string | number): string {
+  if (price === undefined || price === null || price === "") return "";
+  const str = String(price).trim();
+  const numericOnly = str.replace(/[^\d.]/g, "");
+  if (!numericOnly) return str;
+  const num = parseFloat(numericOnly);
+  if (isNaN(num)) return str;
+  const formatted = num.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
+  return `₹${formatted}`;
+}
+
+/**
+ * Extracts or computes the discount badge text (e.g. "20% OFF")
+ */
+export function getDiscountBadge(
+  original?: string | number,
+  discount?: string | number,
+  explicitDiscount?: string
+): string {
+  if (explicitDiscount) {
+    const cleaned = explicitDiscount.replace(/%?\s*OFF/i, "").trim();
+    if (cleaned) return `${cleaned}% OFF`;
+  }
+  if (!original || !discount) return "";
+  const origNum = parseFloat(String(original).replace(/[^\d.]/g, ""));
+  const discNum = parseFloat(String(discount).replace(/[^\d.]/g, ""));
+  if (origNum > 0 && discNum > 0 && origNum > discNum) {
+    const pct = Math.round(((origNum - discNum) / origNum) * 100);
+    if (pct > 0) return `${pct}% OFF`;
+  }
+  return "";
+}
+
 interface ProductCardProps {
   product: Product;
   onViewDetails: (product: Product) => void;
@@ -29,10 +67,22 @@ export default function ProductCard({
   );
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
+  // Price calculations & formatting
+  const hasDiscount = Boolean(product.discountPrice && product.discountPrice.trim() !== "");
+  const mainPrice = hasDiscount
+    ? formatPrice(product.discountPrice)
+    : formatPrice(product.originalPrice);
+  const oldPrice = hasDiscount ? formatPrice(product.originalPrice) : "";
+  const discountBadge = getDiscountBadge(
+    product.originalPrice,
+    product.discountPrice,
+    product.discountPercentage
+  );
+
   return (
     <div
       onClick={() => onViewDetails(product)}
-      className={`relative bg-white rounded-2xl border transition-all duration-300 flex flex-col justify-between p-5 group cursor-pointer hover:-translate-y-1.5 hover:shadow-xl hover:shadow-black/5 ${
+      className={`relative bg-white rounded-2xl border transition-all duration-300 flex flex-col justify-between p-5 sm:p-6 group cursor-pointer hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-black/10 ${
         product.featured
           ? "border-amber-300/80 bg-gradient-to-b from-amber-50/20 via-white to-white"
           : "border-[#E2E2DF] hover:border-[#7A2E2E]/40"
@@ -56,11 +106,6 @@ export default function ProductCard({
               Best Seller
             </span>
           )}
-          {product.discountPercentage && (
-            <span className="text-[9px] bg-[#7A2E2E] text-white px-2 py-0.5 font-bold uppercase rounded-full ml-auto">
-              {product.discountPercentage} OFF
-            </span>
-          )}
         </div>
 
         {/* Brand & Name */}
@@ -68,7 +113,7 @@ export default function ProductCard({
           <span className="text-[10px] font-bold text-[#8A6A44] uppercase tracking-wider block">
             {product.brand}
           </span>
-          <h3 className="text-base font-bold text-[#222222] mt-0.5 group-hover:text-[#7A2E2E] transition-colors line-clamp-1">
+          <h3 className="text-base font-bold text-[#111111] mt-0.5 group-hover:text-[#7A2E2E] transition-colors line-clamp-1">
             {product.name}
           </h3>
         </div>
@@ -114,24 +159,27 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* Pricing Layout */}
-        <div className="flex items-baseline gap-2 mb-3">
-          {product.discountPrice ? (
-            <>
-              <span className="text-lg sm:text-xl font-black text-[#7A2E2E]">
-                {product.discountPrice}
-              </span>
-              <span className="text-xs line-through text-[#888888] font-medium">
-                {product.originalPrice}
-              </span>
-            </>
-          ) : product.originalPrice ? (
-            <span className="text-lg sm:text-xl font-black text-[#7A2E2E]">
-              {product.originalPrice}
+        {/* Price Hierarchy Section */}
+        <div className="flex items-baseline flex-wrap gap-2.5 mb-3">
+          {mainPrice ? (
+            <span className="text-xl sm:text-2xl font-black text-[#111111] tracking-tight">
+              {mainPrice}
             </span>
           ) : (
             <span className="text-sm font-semibold text-[#666666]">
               Price on request
+            </span>
+          )}
+
+          {oldPrice && (
+            <span className="text-xs sm:text-sm text-[#888888] line-through font-medium">
+              {oldPrice}
+            </span>
+          )}
+
+          {discountBadge && (
+            <span className="bg-[#DC2626] text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md uppercase tracking-wider inline-flex items-center shadow-xs ml-auto sm:ml-0">
+              {discountBadge}
             </span>
           )}
         </div>
@@ -143,7 +191,7 @@ export default function ProductCard({
 
         {/* Specifications preview badges */}
         {Array.isArray(product.specifications) && product.specifications.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-4">
+          <div className="flex flex-wrap gap-1.5 mb-4">
             {product.specifications.slice(0, 2).map((spec, i) => (
               <span
                 key={i}
@@ -164,7 +212,7 @@ export default function ProductCard({
             e.stopPropagation();
             onViewDetails(product);
           }}
-          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#E2E2DF] hover:border-[#222222] hover:bg-[#FAF9F6] text-[#222222] text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#E2E2DF] hover:border-[#111111] hover:bg-[#FAF9F6] text-[#222222] text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
         >
           <Eye size={13} />
           Details
