@@ -11,7 +11,7 @@ import { Product } from "@/data/products";
 import ImageUploader from "@/components/ImageUploader";
 import {
   fetchSiteContent, saveSiteContentApi,
-  fetchProducts, saveProductApi, deleteProductApi, bulkDiscountApi,
+  fetchProducts, saveProductApi, deleteProductApi,
 } from "@/lib/apiClient";
 import { formatPrice, calculateProductPricing } from "@/components/ProductCard";
 import { createClient } from "@/lib/supabase/client";
@@ -749,36 +749,10 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  const [bulkDiscounting, setBulkDiscounting] = useState(false);
-  const [bulkDiscountSuccess, setBulkDiscountSuccess] = useState("");
-  const [bulkCustomPct, setBulkCustomPct] = useState("10");
-
   const refreshProducts = useCallback(async () => {
     const list = await fetchProducts();
     setProducts(list);
   }, []);
-
-  const handleBulkDiscount = async (pct: number, remove = false) => {
-    const confirmMsg = remove
-      ? "Remove discounts from all products in the catalogue?"
-      : `Apply a ${pct}% discount across all products in the catalogue?`;
-    if (!window.confirm(confirmMsg)) return;
-
-    setBulkDiscounting(true);
-    setBulkDiscountSuccess("");
-    const res = await bulkDiscountApi({ percentage: pct, remove }, token);
-    setBulkDiscounting(false);
-
-    if (res.ok) {
-      setBulkDiscountSuccess(
-        remove ? "All product discounts removed successfully." : `Successfully applied ${pct}% discount to all products!`
-      );
-      setTimeout(() => setBulkDiscountSuccess(""), 4000);
-      await refreshProducts();
-    } else {
-      alert(res.error || "Failed to update bulk discounts.");
-    }
-  };
 
   useEffect(() => {
     refreshProducts();
@@ -1114,80 +1088,10 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
         </form>
 
         {/* Products Table List */}
-        <div className="xl:col-span-6 space-y-4">
-          {/* Quick Bulk Discount for All Box */}
-          <div className="bg-[#FAF9F6] border border-[#E2E2DF] p-4 rounded-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#222222] flex items-center gap-1.5">
-                  <Tag size={13} className="text-[#7A2E2E]" /> Bulk Discount for All Products
-                </h4>
-                <p className="text-[11px] text-[#666666] mt-0.5">
-                  Quickly set or clear discounts across your entire inventory in one click.
-                </p>
-              </div>
-              {bulkDiscounting && (
-                <div className="flex items-center gap-1.5 text-xs text-[#7A2E2E] font-semibold">
-                  <Loader2 size={13} className="animate-spin" /> Updating...
-                </div>
-              )}
-            </div>
-
-            {bulkDiscountSuccess && (
-              <div className="text-[11px] bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium">
-                <CheckCircle size={12} /> {bulkDiscountSuccess}
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {[5, 10, 15, 20].map((pct) => (
-                <button
-                  key={pct}
-                  type="button"
-                  disabled={bulkDiscounting}
-                  onClick={() => handleBulkDiscount(pct)}
-                  className="px-2.5 py-1 text-xs font-bold bg-white border border-[#E2E2DF] hover:border-[#7A2E2E] hover:text-[#7A2E2E] rounded-md transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {pct}% OFF
-                </button>
-              ))}
-
-              <div className="flex items-center gap-1 ml-auto">
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={bulkCustomPct}
-                  onChange={(e) => setBulkCustomPct(e.target.value)}
-                  placeholder="%"
-                  className="w-14 bg-white border border-[#E2E2DF] px-2 py-1 text-xs text-center rounded-md focus:outline-none focus:border-[#7A2E2E]"
-                />
-                <button
-                  type="button"
-                  disabled={bulkDiscounting || !bulkCustomPct}
-                  onClick={() => handleBulkDiscount(Number(bulkCustomPct))}
-                  className="px-2.5 py-1 text-xs font-bold bg-[#7A2E2E] hover:bg-[#5F2222] text-white rounded-md transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Apply %
-                </button>
-                <button
-                  type="button"
-                  disabled={bulkDiscounting}
-                  onClick={() => handleBulkDiscount(0, true)}
-                  className="px-2.5 py-1 text-xs font-bold text-[#666666] hover:text-red-700 hover:bg-red-50 border border-[#E2E2DF] rounded-md transition-colors cursor-pointer disabled:opacity-50"
-                  title="Remove all discounts"
-                >
-                  Clear All
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222]">
-              Inventory Catalogue ({products.length})
-            </h3>
-          </div>
+        <div className="xl:col-span-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">
+            Inventory Catalogue ({products.length})
+          </h3>
 
           <div className="border border-[#E2E2DF] overflow-x-auto rounded-xl bg-white">
             <table className="w-full text-left text-xs">

@@ -265,55 +265,6 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // ── Handle Bulk Discount Action ──
-    if (body && body.action === "bulk_discount") {
-      const percentage = Number(body.percentage) || 0;
-      const remove = Boolean(body.remove);
-
-      // Fetch all products
-      const { data: allProducts, error: pErr } = await supabase.from("products").select("*");
-      if (pErr) throw new Error(pErr.message);
-
-      const { id: scId, data: scData, extras: curExtras } = await getProductExtras(supabase);
-      const newExtras = { ...curExtras };
-
-      for (const prod of (allProducts || [])) {
-        const prodId = String(prod.id);
-        const curPriceNum = parseFloat(String(prod.price || prod.original_price || "0").replace(/[^\d.]/g, ""));
-
-        if (remove) {
-          if (newExtras[prodId]) {
-            delete newExtras[prodId].discountPrice;
-            delete newExtras[prodId].discountPercentage;
-          }
-        } else if (percentage > 0 && curPriceNum > 0) {
-          const orig = newExtras[prodId]?.originalPrice || prod.original_price || curPriceNum;
-          const origNum = parseFloat(String(orig).replace(/[^\d.]/g, ""));
-          const discNum = Math.round(origNum * (1 - percentage / 100));
-
-          newExtras[prodId] = {
-            ...(newExtras[prodId] || {}),
-            originalPrice: String(origNum),
-            discountPrice: String(discNum),
-            discountPercentage: `${percentage}%`,
-          };
-        }
-      }
-
-      if (scId && scData) {
-        await supabase
-          .from("site_content")
-          .update({
-            data: { ...scData, productExtras: newExtras },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", scId);
-      }
-
-      return NextResponse.json({ ok: true, count: allProducts?.length || 0 });
-    }
-
-    // ── Handle Single Product Upsert ──
     const productPayload = Array.isArray(body) ? body[0] : body;
 
     if (!productPayload || typeof productPayload !== "object") {
