@@ -13,13 +13,19 @@ function cleanProductId(id?: string | number): string | number {
 }
 
 function mapProductToRow(p: any) {
+  const imgList = Array.isArray(p.images) && p.images.length > 0
+    ? p.images.map((s: any) => String(s).trim()).filter(Boolean)
+    : (p.image ? [String(p.image).trim()] : []);
+  const mainImg = imgList[0] || (p.image ? String(p.image).trim() : "");
+
   return {
     id: p.id || crypto.randomUUID(),
     name: p.name,
     brand: p.brand || "",
     category: p.category || "",
     description: p.description || "",
-    images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
+    image: mainImg,
+    images: imgList,
     specifications: Array.isArray(p.specifications) ? p.specifications : [],
     original_price: p.originalPrice || p.original_price || "",
     discount_price: p.discountPrice || p.discount_price || null,
@@ -293,7 +299,7 @@ export async function POST(request: NextRequest) {
         newArrival: Boolean(productPayload.newArrival),
         bestSeller: Boolean(productPayload.bestSeller),
         stockStatus: productPayload.stockStatus || "In Stock",
-        images: productPayload.images,
+        images: row.images,
       });
     }
 

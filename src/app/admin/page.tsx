@@ -727,7 +727,7 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
   const [brand, setBrand] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>([""]);
   const [specifications, setSpecifications] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [discountPrice, setDiscountPrice] = useState("");
@@ -773,7 +773,7 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
     }
 
     const specsArray = specifications.split(",").map((s) => s.trim()).filter(Boolean);
-    const validImages = images.filter(Boolean);
+    const validImages = images.map((s) => String(s || "").trim()).filter(Boolean);
 
     const productData: any = {
       ...(editingId ? { id: editingId } : {}),
@@ -781,6 +781,7 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
       brand,
       category,
       description,
+      image: validImages[0] || "",
       images: validImages,
       specifications: specsArray,
       originalPrice,
@@ -820,7 +821,7 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
     setBrand("");
     setCategory(categories[0]?.name || "");
     setDescription("");
-    setImages([]);
+    setImages([""]);
     setSpecifications("");
     setOriginalPrice("");
     setDiscountPrice("");
@@ -844,7 +845,10 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
     setBrand(p.brand || "");
     setCategory(p.category || categories[0]?.name || "");
     setDescription(p.description || "");
-    setImages(Array.isArray(p.images) ? p.images : []);
+    const rawImages = Array.isArray(p.images) && p.images.length > 0
+      ? p.images.map((s) => String(s).trim()).filter(Boolean)
+      : ((p as any).image ? [String((p as any).image).trim()] : []);
+    setImages(rawImages.length > 0 ? rawImages : [""]);
     setSpecifications(Array.isArray(p.specifications) ? p.specifications.join(", ") : "");
     setOriginalPrice(p.originalPrice || "");
     setDiscountPrice(p.discountPrice || "");
@@ -1112,18 +1116,28 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
                   </tr>
                 ) : (
                   products.map((p) => {
-                    const firstImage = p.images?.[0] || "";
+                    const validImgs = Array.isArray(p.images) && p.images.length > 0
+                      ? p.images.filter(Boolean)
+                      : ((p as any).image ? [(p as any).image] : []);
+                    const firstImage = validImgs[0] || "";
                     const { hasDiscount, mainPrice, oldPrice, discountBadge } = calculateProductPricing(p);
                     return (
                       <tr key={p.id} className="hover:bg-[#F8F8F6]/50 transition-colors">
                         <td className="p-3 flex items-center gap-3">
-                          {firstImage ? (
-                            <img src={firstImage} alt={p.name} className="w-10 h-10 object-contain border border-[#E2E2DF] bg-white p-1 rounded-md" />
-                          ) : (
-                            <div className="w-10 h-10 border border-[#E2E2DF] bg-[#F8F8F6] flex items-center justify-center text-[#AAAAAA] rounded-md">
-                              <Package size={14} />
-                            </div>
-                          )}
+                          <div className="relative flex-shrink-0">
+                            {firstImage ? (
+                              <img src={firstImage} alt={p.name} className="w-10 h-10 object-contain border border-[#E2E2DF] bg-white p-1 rounded-md" />
+                            ) : (
+                              <div className="w-10 h-10 border border-[#E2E2DF] bg-[#F8F8F6] flex items-center justify-center text-[#AAAAAA] rounded-md">
+                                <Package size={14} />
+                              </div>
+                            )}
+                            {validImgs.length > 1 && (
+                              <span className="absolute -top-1.5 -right-1.5 bg-[#7A2E2E] text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-xs" title={`${validImgs.length} photos`}>
+                                {validImgs.length}
+                              </span>
+                            )}
+                          </div>
                           <div>
                             <div className="font-bold text-[#222222] flex items-center gap-1.5">
                               {p.name}

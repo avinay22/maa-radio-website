@@ -79,9 +79,9 @@ export default function ProductDetailPage() {
   }
 
   const images = Array.isArray(product.images) && product.images.length > 0
-    ? product.images
-    : [];
-  const activeImage = images[activeImageIndex] || "";
+    ? product.images.map((s) => String(s).trim()).filter(Boolean)
+    : ((product as any).image ? [String((product as any).image).trim()] : []);
+  const activeImage = images[activeImageIndex] || images[0] || "";
 
   const whatsappMessage = encodeURIComponent(
     `Hi ${STATIC_CONTENT.ownerName}, I am interested in ${product.brand} ${product.name} listed on your website. Is it available in stock?`

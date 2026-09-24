@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { MessageSquare, Eye, Sparkles, CheckCircle, AlertCircle, Package } from "lucide-react";
+import React, { useState } from "react";
+import { MessageSquare, Eye, Sparkles, CheckCircle, AlertCircle, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import { Product } from "@/data/products";
 import { STATIC_CONTENT } from "@/data/siteContent";
 
@@ -113,10 +113,11 @@ export default function ProductCard({
   className = "",
 }: ProductCardProps) {
   const images = Array.isArray(product.images) && product.images.length > 0
-    ? product.images
-    : [];
+    ? product.images.filter(Boolean)
+    : ((product as any).image ? [(product as any).image] : []);
 
-  const mainImage = images[0] || "";
+  const [activeIdx, setActiveIdx] = useState(0);
+  const currentImage = images[activeIdx] || images[0] || "";
 
   const whatsappMessage = encodeURIComponent(
     `Hi ${STATIC_CONTENT.ownerName}, I am interested in buying the ${product.brand} ${product.name} listed on your website. Is it currently in stock?`
@@ -125,6 +126,20 @@ export default function ProductCard({
 
   // Price calculations & formatting
   const { mainPrice, oldPrice, discountBadge } = calculateProductPricing(product);
+
+  const handleNextPhoto = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (images.length > 1) {
+      setActiveIdx((prev) => (prev + 1) % images.length);
+    }
+  };
+
+  const handlePrevPhoto = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (images.length > 1) {
+      setActiveIdx((prev) => (prev - 1 + images.length) % images.length);
+    }
+  };
 
   return (
     <div
@@ -165,12 +180,12 @@ export default function ProductCard({
           </h3>
         </div>
 
-        {/* Product Image Stage */}
-        <div className="aspect-[4/3] w-full bg-[#FAF9F6] border border-[#E2E2DF]/60 rounded-xl p-4 mb-4 flex items-center justify-center overflow-hidden relative">
-          {mainImage ? (
+        {/* Product Image Stage with Interactive Multi-photo Browsing */}
+        <div className="aspect-[4/3] w-full bg-[#FAF9F6] border border-[#E2E2DF]/60 rounded-xl p-4 mb-4 flex items-center justify-center overflow-hidden relative group/img">
+          {currentImage ? (
             <img
-              src={mainImage}
-              alt={product.name}
+              src={currentImage}
+              alt={`${product.name} - photo ${activeIdx + 1}`}
               className="max-h-[140px] w-auto object-contain transition-transform duration-500 group-hover:scale-108"
               loading="lazy"
             />
@@ -180,8 +195,48 @@ export default function ProductCard({
             </div>
           )}
 
+          {/* Navigation Arrows for Multiple Photos */}
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={handlePrevPhoto}
+                className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white/95 hover:bg-white text-[#222222] shadow border border-[#E2E2DF] flex items-center justify-center transition-all opacity-0 group-hover/img:opacity-100 hover:scale-110"
+                title="Previous photo"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={handleNextPhoto}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white/95 hover:bg-white text-[#222222] shadow border border-[#E2E2DF] flex items-center justify-center transition-all opacity-0 group-hover/img:opacity-100 hover:scale-110"
+                title="Next photo"
+              >
+                <ChevronRight size={15} />
+              </button>
+
+              {/* Dot Indicators */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded-full">
+                {images.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveIdx(i);
+                    }}
+                    className={`h-1.5 rounded-full transition-all ${
+                      activeIdx === i ? "bg-white w-3" : "bg-white/60 hover:bg-white w-1.5"
+                    }`}
+                    title={`View photo ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
           {/* Stock status pill */}
-          <div className="absolute bottom-2 right-2">
+          <div className="absolute top-2 right-2 z-10">
             <span
               className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded-full border flex items-center gap-1 ${
                 product.stockStatus === "In Stock" || product.stockStatus === "Limited Stock"
@@ -200,8 +255,8 @@ export default function ProductCard({
 
           {/* Multiple images indicator */}
           {images.length > 1 && (
-            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
-              {images.length} photos
+            <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
+              {activeIdx + 1}/{images.length} photos
             </div>
           )}
         </div>

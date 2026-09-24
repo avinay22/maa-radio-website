@@ -175,9 +175,9 @@ export default function HomePage() {
                   {/* Product Image */}
                   <div className="relative flex justify-center items-center py-4">
                     <div className="absolute w-[220px] h-[220px] bg-[#8A6A44]/5 rounded-full blur-3xl -z-10" />
-                    {heroProduct.images?.[0] ? (
+                    {(heroProduct.images?.[0] || (heroProduct as any).image) ? (
                       <img
-                        src={heroProduct.images[0]}
+                        src={heroProduct.images?.[0] || (heroProduct as any).image}
                         alt={heroProduct.name}
                         className="w-auto h-[220px] object-contain drop-shadow-[0_20px_40px_rgba(34,34,34,0.12)] hover:scale-105 transition-transform duration-500"
                         loading="eager"
