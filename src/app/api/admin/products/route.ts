@@ -72,6 +72,9 @@ async function upsertWithFallback(supabaseClient: any, data: any) {
 
     if (match && match[1]) {
       const missingCol = match[1];
+      if (missingCol === "discount_price" && currentData.discount_price && !currentData.price) {
+        currentData.price = currentData.discount_price;
+      }
       if (missingCol === "original_price" && currentData.original_price && !currentData.price) {
         currentData.price = currentData.original_price;
       }
@@ -87,8 +90,69 @@ async function upsertWithFallback(supabaseClient: any, data: any) {
 }
 
 // ─────────────────────────────────────────
+// Helpers for Product Extras (discounts, badges, offers)
+// Stored in site_content JSONB for 100% schema resilience
+// ─────────────────────────────────────────
+async function getProductExtras(supabase: any) {
+  try {
+    const { data } = await supabase.from("site_content").select("id, data").limit(1).single();
+    if (data && data.data && typeof data.data === "object") {
+      return { id: data.id, data: data.data, extras: (data.data.productExtras || {}) as Record<string, any> };
+    }
+  } catch (e) {
+    console.error("[getProductExtras error]", e);
+  }
+  return { id: null, data: null, extras: {} as Record<string, any> };
+}
+
+async function saveProductExtra(supabase: any, productId: string | number, extraData: any) {
+  try {
+    const { id, data, extras } = await getProductExtras(supabase);
+    if (!id || !data) return;
+
+    const newExtras = {
+      ...extras,
+      [String(productId)]: {
+        ...(extras[String(productId)] || {}),
+        ...extraData,
+      },
+    };
+
+    await supabase
+      .from("site_content")
+      .update({
+        data: { ...data, productExtras: newExtras },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+  } catch (e) {
+    console.error("[saveProductExtra error]", e);
+  }
+}
+
+async function removeProductExtra(supabase: any, productId: string | number) {
+  try {
+    const { id, data, extras } = await getProductExtras(supabase);
+    if (!id || !data) return;
+
+    const newExtras = { ...extras };
+    delete newExtras[String(productId)];
+
+    await supabase
+      .from("site_content")
+      .update({
+        data: { ...data, productExtras: newExtras },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+  } catch (e) {
+    console.error("[removeProductExtra error]", e);
+  }
+}
+
+// ─────────────────────────────────────────
 // GET /api/admin/products
-// Fetch all products directly from Supabase
+// Fetch all products directly from Supabase + extras
 // ─────────────────────────────────────────
 export async function GET() {
   try {
@@ -110,35 +174,43 @@ export async function GET() {
 
     if (error) throw new Error(error.message);
 
-    const products: Product[] = (data || []).map((d: any) => ({
-      id: String(d.id),
-      name: d.name || "",
-      brand: d.brand || "",
-      category: d.category || "",
-      description: d.description || "",
-      images: Array.isArray(d.images) && d.images.length > 0
-        ? d.images
-        : (d.image ? [d.image] : []),
-      specifications: Array.isArray(d.specifications)
-        ? d.specifications
-        : (typeof d.specifications === "string" && d.specifications
-            ? d.specifications.split(",").map((s: string) => s.trim()).filter(Boolean)
-            : []),
-      originalPrice: d.original_price || (d.price ? String(d.price) : ""),
-      discountPrice: d.discount_price || undefined,
-      discountPercentage: d.discount_percentage || undefined,
-      featured: Boolean(d.featured),
-      newArrival: Boolean(d.new_arrival),
-      bestSeller: Boolean(d.best_seller),
-      stockStatus: d.stock_status || "In Stock",
-      warranty: d.warranty || undefined,
-      emiAvailable: Boolean(d.emi_available),
-      freeGift: d.free_gift || undefined,
-      comboOffer: d.combo_offer || undefined,
-      cashbackOffer: d.cashback_offer || undefined,
-      offersAndPromotions: d.offers_and_promotions || undefined,
-      isAccessoryPageOnly: Boolean(d.is_accessory_page_only),
-    }));
+    // Fetch extras from site_content
+    const { extras: productExtras } = await getProductExtras(supabase);
+
+    const products: Product[] = (data || []).map((d: any) => {
+      const extra = productExtras[String(d.id)] || {};
+      return {
+        id: String(d.id),
+        name: d.name || "",
+        brand: d.brand || "",
+        category: d.category || "",
+        description: d.description || "",
+        images: Array.isArray(d.images) && d.images.length > 0
+          ? d.images
+          : (Array.isArray(extra.images) && extra.images.length > 0
+              ? extra.images
+              : (d.image ? [d.image] : [])),
+        specifications: Array.isArray(d.specifications)
+          ? d.specifications
+          : (typeof d.specifications === "string" && d.specifications
+              ? d.specifications.split(",").map((s: string) => s.trim()).filter(Boolean)
+              : []),
+        originalPrice: d.original_price || extra.originalPrice || (d.price ? String(d.price) : ""),
+        discountPrice: d.discount_price || extra.discountPrice || undefined,
+        discountPercentage: d.discount_percentage || extra.discountPercentage || undefined,
+        featured: Boolean(d.featured ?? extra.featured),
+        newArrival: Boolean(d.new_arrival ?? extra.newArrival),
+        bestSeller: Boolean(d.best_seller ?? extra.bestSeller),
+        stockStatus: d.stock_status || extra.stockStatus || "In Stock",
+        warranty: d.warranty || extra.warranty || undefined,
+        emiAvailable: Boolean(d.emi_available ?? extra.emiAvailable),
+        freeGift: d.free_gift || extra.freeGift || undefined,
+        comboOffer: d.combo_offer || extra.comboOffer || undefined,
+        cashbackOffer: d.cashback_offer || extra.cashbackOffer || undefined,
+        offersAndPromotions: d.offers_and_promotions || extra.offersAndPromotions || undefined,
+        isAccessoryPageOnly: Boolean(d.is_accessory_page_only ?? extra.isAccessoryPageOnly),
+      };
+    });
 
     return NextResponse.json(products, {
       status: 200,
@@ -157,7 +229,7 @@ export async function GET() {
 
 // ─────────────────────────────────────────
 // POST /api/admin/products
-// Upsert single product directly to Supabase
+// Upsert single product or bulk operations
 // ─────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
@@ -188,6 +260,60 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    // ── Handle Bulk Discount Action ──
+    if (body && body.action === "bulk_discount") {
+      const percentage = Number(body.percentage) || 0;
+      const remove = Boolean(body.remove);
+
+      // Fetch all products
+      const { data: allProducts, error: pErr } = await supabase.from("products").select("*");
+      if (pErr) throw new Error(pErr.message);
+
+      const { id: scId, data: scData, extras: curExtras } = await getProductExtras(supabase);
+      const newExtras = { ...curExtras };
+
+      for (const prod of (allProducts || [])) {
+        const prodId = String(prod.id);
+        const curPriceNum = parseFloat(String(prod.price || prod.original_price || "0").replace(/[^\d.]/g, ""));
+
+        if (remove) {
+          if (newExtras[prodId]) {
+            delete newExtras[prodId].discountPrice;
+            delete newExtras[prodId].discountPercentage;
+          }
+        } else if (percentage > 0 && curPriceNum > 0) {
+          const orig = newExtras[prodId]?.originalPrice || prod.original_price || curPriceNum;
+          const origNum = parseFloat(String(orig).replace(/[^\d.]/g, ""));
+          const discNum = Math.round(origNum * (1 - percentage / 100));
+
+          newExtras[prodId] = {
+            ...(newExtras[prodId] || {}),
+            originalPrice: String(origNum),
+            discountPrice: String(discNum),
+            discountPercentage: `${percentage}%`,
+          };
+        }
+      }
+
+      if (scId && scData) {
+        await supabase
+          .from("site_content")
+          .update({
+            data: { ...scData, productExtras: newExtras },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", scId);
+      }
+
+      return NextResponse.json({ ok: true, count: allProducts?.length || 0 });
+    }
+
+    // ── Handle Single Product Upsert ──
     const productPayload = Array.isArray(body) ? body[0] : body;
 
     if (!productPayload || typeof productPayload !== "object") {
@@ -197,13 +323,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
     const row = mapProductToRow(productPayload);
     const savedRow = await upsertWithFallback(supabase, row);
+
+    // Persist full extras to site_content
+    const targetId = savedRow.id || productPayload.id;
+    if (targetId) {
+      await saveProductExtra(supabase, targetId, {
+        originalPrice: productPayload.originalPrice,
+        discountPrice: productPayload.discountPrice || undefined,
+        discountPercentage: productPayload.discountPercentage || undefined,
+        warranty: productPayload.warranty || undefined,
+        emiAvailable: Boolean(productPayload.emiAvailable),
+        freeGift: productPayload.freeGift || undefined,
+        comboOffer: productPayload.comboOffer || undefined,
+        cashbackOffer: productPayload.cashbackOffer || undefined,
+        offersAndPromotions: productPayload.offersAndPromotions || undefined,
+        newArrival: Boolean(productPayload.newArrival),
+        bestSeller: Boolean(productPayload.bestSeller),
+        stockStatus: productPayload.stockStatus || "In Stock",
+        images: productPayload.images,
+      });
+    }
 
     return NextResponse.json({ ok: true, product: savedRow }, { status: 200 });
   } catch (err: any) {
@@ -277,6 +418,12 @@ export async function DELETE(request: NextRequest) {
       error = res.error;
     }
     if (error) throw new Error(error.message);
+
+    // Also remove from extras
+    await removeProductExtra(supabase, id);
+    if (String(cleanId) !== String(id)) {
+      await removeProductExtra(supabase, cleanId);
+    }
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {

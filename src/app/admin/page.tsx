@@ -11,8 +11,9 @@ import { Product } from "@/data/products";
 import ImageUploader from "@/components/ImageUploader";
 import {
   fetchSiteContent, saveSiteContentApi,
-  fetchProducts, saveProductApi, deleteProductApi,
+  fetchProducts, saveProductApi, deleteProductApi, bulkDiscountApi,
 } from "@/lib/apiClient";
+import { formatPrice, calculateProductPricing } from "@/components/ProductCard";
 import { createClient } from "@/lib/supabase/client";
 
 type Tab = "business" | "categories" | "offers" | "gallery" | "products";
@@ -748,10 +749,36 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
+  const [bulkDiscounting, setBulkDiscounting] = useState(false);
+  const [bulkDiscountSuccess, setBulkDiscountSuccess] = useState("");
+  const [bulkCustomPct, setBulkCustomPct] = useState("10");
+
   const refreshProducts = useCallback(async () => {
     const list = await fetchProducts();
     setProducts(list);
   }, []);
+
+  const handleBulkDiscount = async (pct: number, remove = false) => {
+    const confirmMsg = remove
+      ? "Remove discounts from all products in the catalogue?"
+      : `Apply a ${pct}% discount across all products in the catalogue?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setBulkDiscounting(true);
+    setBulkDiscountSuccess("");
+    const res = await bulkDiscountApi({ percentage: pct, remove }, token);
+    setBulkDiscounting(false);
+
+    if (res.ok) {
+      setBulkDiscountSuccess(
+        remove ? "All product discounts removed successfully." : `Successfully applied ${pct}% discount to all products!`
+      );
+      setTimeout(() => setBulkDiscountSuccess(""), 4000);
+      await refreshProducts();
+    } else {
+      alert(res.error || "Failed to update bulk discounts.");
+    }
+  };
 
   useEffect(() => {
     refreshProducts();
@@ -1087,9 +1114,82 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
         </form>
 
         {/* Products Table List */}
-        <div className="xl:col-span-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222] mb-4">Inventory Catalogue</h3>
-          <div className="border border-[#E2E2DF] overflow-x-auto">
+        <div className="xl:col-span-6 space-y-4">
+          {/* Quick Bulk Discount for All Box */}
+          <div className="bg-[#FAF9F6] border border-[#E2E2DF] p-4 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#222222] flex items-center gap-1.5">
+                  <Tag size={13} className="text-[#7A2E2E]" /> Bulk Discount for All Products
+                </h4>
+                <p className="text-[11px] text-[#666666] mt-0.5">
+                  Quickly set or clear discounts across your entire inventory in one click.
+                </p>
+              </div>
+              {bulkDiscounting && (
+                <div className="flex items-center gap-1.5 text-xs text-[#7A2E2E] font-semibold">
+                  <Loader2 size={13} className="animate-spin" /> Updating...
+                </div>
+              )}
+            </div>
+
+            {bulkDiscountSuccess && (
+              <div className="text-[11px] bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium">
+                <CheckCircle size={12} /> {bulkDiscountSuccess}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {[5, 10, 15, 20].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  disabled={bulkDiscounting}
+                  onClick={() => handleBulkDiscount(pct)}
+                  className="px-2.5 py-1 text-xs font-bold bg-white border border-[#E2E2DF] hover:border-[#7A2E2E] hover:text-[#7A2E2E] rounded-md transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {pct}% OFF
+                </button>
+              ))}
+
+              <div className="flex items-center gap-1 ml-auto">
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={bulkCustomPct}
+                  onChange={(e) => setBulkCustomPct(e.target.value)}
+                  placeholder="%"
+                  className="w-14 bg-white border border-[#E2E2DF] px-2 py-1 text-xs text-center rounded-md focus:outline-none focus:border-[#7A2E2E]"
+                />
+                <button
+                  type="button"
+                  disabled={bulkDiscounting || !bulkCustomPct}
+                  onClick={() => handleBulkDiscount(Number(bulkCustomPct))}
+                  className="px-2.5 py-1 text-xs font-bold bg-[#7A2E2E] hover:bg-[#5F2222] text-white rounded-md transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Apply %
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkDiscounting}
+                  onClick={() => handleBulkDiscount(0, true)}
+                  className="px-2.5 py-1 text-xs font-bold text-[#666666] hover:text-red-700 hover:bg-red-50 border border-[#E2E2DF] rounded-md transition-colors cursor-pointer disabled:opacity-50"
+                  title="Remove all discounts"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222]">
+              Inventory Catalogue ({products.length})
+            </h3>
+          </div>
+
+          <div className="border border-[#E2E2DF] overflow-x-auto rounded-xl bg-white">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8F8F6] border-b border-[#E2E2DF] text-[#222222] uppercase tracking-wider font-bold">
                 <tr>
@@ -1109,13 +1209,14 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
                 ) : (
                   products.map((p) => {
                     const firstImage = p.images?.[0] || "";
+                    const { hasDiscount, mainPrice, oldPrice, discountBadge } = calculateProductPricing(p);
                     return (
                       <tr key={p.id} className="hover:bg-[#F8F8F6]/50 transition-colors">
                         <td className="p-3 flex items-center gap-3">
                           {firstImage ? (
-                            <img src={firstImage} alt={p.name} className="w-10 h-10 object-contain border border-[#E2E2DF] bg-white p-1" />
+                            <img src={firstImage} alt={p.name} className="w-10 h-10 object-contain border border-[#E2E2DF] bg-white p-1 rounded-md" />
                           ) : (
-                            <div className="w-10 h-10 border border-[#E2E2DF] bg-[#F8F8F6] flex items-center justify-center text-[#AAAAAA]">
+                            <div className="w-10 h-10 border border-[#E2E2DF] bg-[#F8F8F6] flex items-center justify-center text-[#AAAAAA] rounded-md">
                               <Package size={14} />
                             </div>
                           )}
@@ -1129,14 +1230,25 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
                         </td>
                         <td className="p-3 text-[#666666]">{p.category}</td>
                         <td className="p-3 text-right">
-                          <span className="font-semibold text-[#7A2E2E]">{p.discountPrice || p.originalPrice}</span>
-                          {p.discountPrice && <div className="text-[8px] line-through text-[#999999]">{p.originalPrice}</div>}
+                          <div className="flex flex-col items-end">
+                            <span className="font-bold text-[#7A2E2E]">{mainPrice}</span>
+                            {hasDiscount && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[9px] line-through text-[#999999]">{oldPrice}</span>
+                                {discountBadge && (
+                                  <span className="text-[8px] bg-red-100 text-red-700 font-bold px-1 rounded">
+                                    {discountBadge}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex justify-center gap-1">
                             <button
                               onClick={() => startEdit(p)}
-                              className="p-1 border border-[#E2E2DF] hover:border-[#8A6A44] hover:text-[#8A6A44] transition-colors"
+                              className="p-1 border border-[#E2E2DF] hover:border-[#8A6A44] hover:text-[#8A6A44] transition-colors rounded"
                               title="Edit product"
                             >
                               <Edit2 size={12} />
@@ -1144,7 +1256,7 @@ function ProductsTab({ categories, token }: ProductsTabProps) {
                             <button
                               onClick={() => handleDelete(p.id, p.name)}
                               disabled={saving}
-                              className="p-1 border border-[#E2E2DF] text-[#7A2E2E] hover:bg-[#7A2E2E]/10 transition-colors disabled:opacity-50"
+                              className="p-1 border border-[#E2E2DF] text-[#7A2E2E] hover:bg-[#7A2E2E]/10 transition-colors disabled:opacity-50 rounded"
                               title="Delete product"
                             >
                               <Trash2 size={12} />

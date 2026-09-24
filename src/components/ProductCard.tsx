@@ -16,7 +16,7 @@ export function formatPrice(price?: string | number): string {
   const num = parseFloat(numericOnly);
   if (isNaN(num)) return str;
   const formatted = num.toLocaleString("en-IN", {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   });
   return `₹${formatted}`;
 }
@@ -30,8 +30,12 @@ export function getDiscountBadge(
   explicitDiscount?: string
 ): string {
   if (explicitDiscount) {
-    const cleaned = explicitDiscount.replace(/%?\s*OFF/i, "").trim();
-    if (cleaned) return `${cleaned}% OFF`;
+    const raw = String(explicitDiscount).trim();
+    const numMatch = raw.match(/(\d+(?:\.\d+)?)/);
+    if (numMatch) {
+      return `${Math.round(parseFloat(numMatch[1]))}% OFF`;
+    }
+    return raw;
   }
   if (!original || !discount) return "";
   const origNum = parseFloat(String(original).replace(/[^\d.]/g, ""));
@@ -41,6 +45,58 @@ export function getDiscountBadge(
     if (pct > 0) return `${pct}% OFF`;
   }
   return "";
+}
+
+/**
+ * Calculates effective pricing and discount status for any product
+ */
+export function calculateProductPricing(product: {
+  originalPrice?: string | number;
+  discountPrice?: string | number;
+  discountPercentage?: string;
+}) {
+  const origStr = String(product.originalPrice || "").trim();
+  const discStr = String(product.discountPrice || "").trim();
+  const origNum = parseFloat(origStr.replace(/[^\d.]/g, ""));
+  let discNum = discStr ? parseFloat(discStr.replace(/[^\d.]/g, "")) : 0;
+
+  let effectiveDiscountPrice = discStr;
+
+  // If discount percentage is provided without explicit discount price
+  if (!effectiveDiscountPrice && product.discountPercentage && origNum > 0) {
+    const pctMatch = String(product.discountPercentage).match(/(\d+(?:\.\d+)?)/);
+    if (pctMatch) {
+      const pct = parseFloat(pctMatch[1]);
+      if (pct > 0 && pct < 100) {
+        discNum = Math.round(origNum * (1 - pct / 100));
+        effectiveDiscountPrice = String(discNum);
+      }
+    }
+  }
+
+  const hasDiscount = Boolean(
+    effectiveDiscountPrice &&
+    effectiveDiscountPrice !== "" &&
+    origNum > 0 &&
+    discNum > 0 &&
+    origNum > discNum
+  );
+
+  const mainPrice = hasDiscount
+    ? formatPrice(effectiveDiscountPrice)
+    : (formatPrice(origStr) || (discStr ? formatPrice(discStr) : ""));
+  const oldPrice = hasDiscount ? formatPrice(origStr) : "";
+  const discountBadge = hasDiscount
+    ? getDiscountBadge(origStr, effectiveDiscountPrice, product.discountPercentage)
+    : "";
+
+  return {
+    hasDiscount,
+    mainPrice,
+    oldPrice,
+    discountBadge,
+    effectiveDiscountPrice,
+  };
 }
 
 interface ProductCardProps {
@@ -68,16 +124,7 @@ export default function ProductCard({
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
   // Price calculations & formatting
-  const hasDiscount = Boolean(product.discountPrice && product.discountPrice.trim() !== "");
-  const mainPrice = hasDiscount
-    ? formatPrice(product.discountPrice)
-    : formatPrice(product.originalPrice);
-  const oldPrice = hasDiscount ? formatPrice(product.originalPrice) : "";
-  const discountBadge = getDiscountBadge(
-    product.originalPrice,
-    product.discountPrice,
-    product.discountPercentage
-  );
+  const { mainPrice, oldPrice, discountBadge } = calculateProductPricing(product);
 
   return (
     <div

@@ -11,7 +11,7 @@ import {
 import { Product } from "@/data/products";
 import { SiteContent, DEFAULT_SITE_CONTENT, STATIC_CONTENT } from "@/data/siteContent";
 import { fetchProducts, fetchSiteContent } from "@/lib/apiClient";
-import ProductCard, { formatPrice, getDiscountBadge } from "@/components/ProductCard";
+import ProductCard, { formatPrice, getDiscountBadge, calculateProductPricing } from "@/components/ProductCard";
 import ProductModal from "@/components/ProductModal";
 
 export default function ProductDetailPage() {
@@ -246,27 +246,32 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Pricing Section */}
-            <div className="p-6 bg-[#FAF9F6] border border-[#E2E2DF] rounded-2xl flex items-baseline gap-4 flex-wrap">
-              {product.discountPrice ? (
-                <>
-                  <span className="text-3xl sm:text-4xl font-black text-[#111111]">
-                    {formatPrice(product.discountPrice)}
-                  </span>
-                  <span className="text-base line-through text-[#888888] font-medium">
-                    {formatPrice(product.originalPrice)}
-                  </span>
-                  {getDiscountBadge(product.originalPrice, product.discountPrice, product.discountPercentage) && (
-                    <span className="bg-[#DC2626] text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-md ml-auto shadow-xs">
-                      {getDiscountBadge(product.originalPrice, product.discountPrice, product.discountPercentage)}
+            {(() => {
+              const { hasDiscount, mainPrice, oldPrice, discountBadge } = calculateProductPricing(product);
+              return (
+                <div className="p-6 bg-[#FAF9F6] border border-[#E2E2DF] rounded-2xl flex items-baseline gap-4 flex-wrap">
+                  {hasDiscount ? (
+                    <>
+                      <span className="text-3xl sm:text-4xl font-black text-[#111111]">
+                        {mainPrice}
+                      </span>
+                      <span className="text-base line-through text-[#888888] font-medium">
+                        {oldPrice}
+                      </span>
+                      {discountBadge && (
+                        <span className="bg-[#DC2626] text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-md ml-auto shadow-xs">
+                          {discountBadge}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-3xl sm:text-4xl font-black text-[#111111]">
+                      {mainPrice || "Price on request"}
                     </span>
                   )}
-                </>
-              ) : (
-                <span className="text-3xl sm:text-4xl font-black text-[#111111]">
-                  {formatPrice(product.originalPrice) || "Price on request"}
-                </span>
-              )}
-            </div>
+                </div>
+              );
+            })()}
 
             {/* Offers & Perks */}
             {(product.freeGift || product.comboOffer || product.cashbackOffer || product.emiAvailable || product.warranty || product.offersAndPromotions) && (

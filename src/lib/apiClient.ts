@@ -138,3 +138,24 @@ export async function deleteProductApi(
   }
 }
 
+export async function bulkDiscountApi(
+  payload: { percentage?: number; remove?: boolean },
+  token: string
+): Promise<{ ok: boolean; error?: string; count?: number }> {
+  try {
+    const res = await fetch("/api/admin/products", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: "bulk_discount", ...payload }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error ?? "Bulk discount failed." };
+    return { ok: true, count: data.count };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "Network error. Please try again." };
+  }
+}
+

@@ -12,7 +12,7 @@ import {
 import { SiteContent, DEFAULT_SITE_CONTENT, STATIC_CONTENT } from "@/data/siteContent";
 import { Product } from "@/data/products";
 import { fetchSiteContent, fetchProducts } from "@/lib/apiClient";
-import ProductCard from "@/components/ProductCard";
+import ProductCard, { calculateProductPricing } from "@/components/ProductCard";
 import ProductModal from "@/components/ProductModal";
 
 // ── Offer type badge colours ──────────────────────────────────────────────────
@@ -189,57 +189,64 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  {/* Badges row */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {heroProduct.discountPercentage && (
-                      <span className="bg-[#7A2E2E] text-white text-[9px] font-bold uppercase px-2 py-0.5">
-                        {heroProduct.discountPercentage} OFF
-                      </span>
-                    )}
-                    {heroProduct.offersAndPromotions && (
-                      <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-bold uppercase px-2 py-0.5">
-                        ⏱ Limited Time
-                      </span>
-                    )}
-                    {heroProduct.emiAvailable && (
-                      <span className="bg-teal-50 text-teal-800 border border-teal-200 text-[9px] font-bold uppercase px-2 py-0.5">
-                        💳 EMI Available
-                      </span>
-                    )}
-                    {heroProduct.freeGift && (
-                      <span className="bg-green-50 text-green-800 border border-green-200 text-[9px] font-bold uppercase px-2 py-0.5">
-                        🎁 Free Gift
-                      </span>
-                    )}
-                    {heroProduct.warranty && (
-                      <span className="bg-[#F8F8F6] text-[#666666] border border-[#E2E2DF] text-[9px] font-bold uppercase px-2 py-0.5">
-                        🛡️ {heroProduct.warranty}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Pricing row */}
-                  <div className="flex items-baseline gap-3 pt-1 border-t border-[#E2E2DF]">
-                    {heroProduct.discountPrice ? (
+                  {/* Badges row & Pricing */}
+                  {(() => {
+                    const { hasDiscount, mainPrice, oldPrice, discountBadge } = calculateProductPricing(heroProduct);
+                    return (
                       <>
-                        <span className="text-xl font-extrabold text-[#7A2E2E]">{heroProduct.discountPrice}</span>
-                        <span className="text-sm line-through text-[#AAAAAA]">{heroProduct.originalPrice}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {discountBadge && (
+                            <span className="bg-[#DC2626] text-white text-[9px] font-bold uppercase px-2 py-0.5 rounded-sm shadow-xs">
+                              {discountBadge}
+                            </span>
+                          )}
+                          {heroProduct.offersAndPromotions && (
+                            <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-bold uppercase px-2 py-0.5">
+                              ⏱ Limited Time
+                            </span>
+                          )}
+                          {heroProduct.emiAvailable && (
+                            <span className="bg-teal-50 text-teal-800 border border-teal-200 text-[9px] font-bold uppercase px-2 py-0.5">
+                              💳 EMI Available
+                            </span>
+                          )}
+                          {heroProduct.freeGift && (
+                            <span className="bg-green-50 text-green-800 border border-green-200 text-[9px] font-bold uppercase px-2 py-0.5">
+                              🎁 Free Gift
+                            </span>
+                          )}
+                          {heroProduct.warranty && (
+                            <span className="bg-[#F8F8F6] text-[#666666] border border-[#E2E2DF] text-[9px] font-bold uppercase px-2 py-0.5">
+                              🛡️ {heroProduct.warranty}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Pricing row */}
+                        <div className="flex items-baseline gap-3 pt-1 border-t border-[#E2E2DF]">
+                          {hasDiscount ? (
+                            <>
+                              <span className="text-xl font-extrabold text-[#7A2E2E]">{mainPrice}</span>
+                              <span className="text-sm line-through text-[#AAAAAA]">{oldPrice}</span>
+                            </>
+                          ) : (
+                            <span className="text-xl font-extrabold text-[#7A2E2E]">{mainPrice}</span>
+                          )}
+                          <div className="ml-auto">
+                            <a
+                              href={heroEnquireLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#7A2E2E] hover:bg-[#5F2222] text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+                            >
+                              <MessageSquare size={11} />
+                              {STATIC_CONTENT.heroEnquireLabel}
+                            </a>
+                          </div>
+                        </div>
                       </>
-                    ) : (
-                      <span className="text-xl font-extrabold text-[#7A2E2E]">{heroProduct.originalPrice}</span>
-                    )}
-                    <div className="ml-auto">
-                      <a
-                        href={heroEnquireLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#7A2E2E] hover:bg-[#5F2222] text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
-                      >
-                        <MessageSquare size={11} />
-                        {STATIC_CONTENT.heroEnquireLabel}
-                      </a>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </>
               ) : (
                 /* Placeholder when no featured product is set */
