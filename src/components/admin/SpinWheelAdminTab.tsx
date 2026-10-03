@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import {
   RotateCw, Plus, Trash2, Edit2, CheckCircle, AlertCircle,
-  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw
+  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw, Printer, Search
 } from "lucide-react";
 import { SpinReward, SpinCode, SpinSettings, SpinStats } from "@/lib/spinTypes";
 
@@ -12,6 +12,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [settings, setSettings] = useState<SpinSettings>({ is_active: true });
   const [stats, setStats] = useState<SpinStats>({ total_spins: 0 });
@@ -525,100 +526,119 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
             <div className="flex items-center gap-2">
               <Key size={16} className="text-[#8A6A44]" />
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222]">
-                Customer Spin Codes ({codes.length})
+                101 Master Card List ({codes.length})
               </h3>
             </div>
             <p className="text-[11px] text-[#666666]">
-              Issue unique codes to customers to unlock a spin. One code = one guaranteed spin.
+              Keep these physical cards in order (1 to 101). Customers enter the secret code on their card to win the pre-assigned prize.
             </p>
           </div>
 
-          {/* Quick Generator form */}
-          <form onSubmit={handleGenerateCodes} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={customCode}
-              onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
-              placeholder="Custom Code (e.g. VIP2026)"
-              className="bg-white border border-[#D5D5D0] px-3 py-2 text-xs font-mono font-bold text-[#222222] focus:outline-none focus:border-[#7A2E2E] w-48"
-            />
-            {!customCode && (
-              <select
-                value={codeCount}
-                onChange={(e) => setCodeCount(parseInt(e.target.value, 10))}
-                className="bg-white border border-[#D5D5D0] px-2 py-2 text-xs font-bold text-[#444444]"
-              >
-                <option value={1}>1 Code</option>
-                <option value={5}>5 Random</option>
-                <option value={10}>10 Random</option>
-                <option value={20}>20 Random</option>
-              </select>
-            )}
+          <div className="flex items-center gap-3">
+            {/* Search Box */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search Card # or Code..."
+                className="pl-9 pr-3 py-2 text-xs border border-[#D5D5D0] rounded bg-white w-48 focus:outline-none focus:border-[#7A2E2E]"
+              />
+            </div>
+
+            {/* Print Master Sheet */}
             <button
-              type="submit"
-              disabled={generatingCode}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#8A6A44] hover:bg-[#6D5233] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#8A6A44] text-[#8A6A44] hover:bg-[#8A6A44] hover:text-white text-xs font-bold uppercase tracking-wider rounded transition-colors"
             >
-              <Plus size={13} />
-              {generatingCode ? "Creating…" : "Generate"}
+              <Printer size={13} />
+              Print Cheat Sheet
             </button>
-          </form>
+          </div>
         </div>
 
         {/* Codes Table */}
-        <div className="border border-[#E2E2DF] overflow-x-auto rounded-xl bg-white shadow-xs max-h-96">
+        <div className="border border-[#E2E2DF] overflow-x-auto rounded-xl bg-white shadow-xs max-h-[500px]">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#F8F8F6] border-b border-[#E2E2DF] text-[#222222] uppercase tracking-wider font-bold sticky top-0">
+            <thead className="bg-[#F8F8F6] border-b border-[#E2E2DF] text-[#222222] uppercase tracking-wider font-bold sticky top-0 z-10">
               <tr>
-                <th className="p-3">Spin Code</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Prize Won</th>
+                <th className="p-3 text-center w-20">Card #</th>
+                <th className="p-3">Customer Code</th>
+                <th className="p-3">Pre-Assigned Prize</th>
+                <th className="p-3 text-center">Status</th>
                 <th className="p-3">Redeemed At</th>
-                <th className="p-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E2DF]">
               {codes.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-6 text-center text-xs text-[#888888] italic">
-                    No spin codes generated yet. Generate your first code above.
+                    Loading codes…
                   </td>
                 </tr>
               ) : (
-                codes.map((c) => (
-                  <tr key={c.id} className="hover:bg-[#F8F8F6]/50 transition-colors">
-                    <td className="p-3 font-mono font-bold text-sm text-[#222222]">
-                      {c.code}
-                    </td>
-                    <td className="p-3">
-                      {c.used ? (
-                        <span className="bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
-                          Claimed
-                        </span>
-                      ) : (
-                        <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
-                          Available
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 font-bold text-[#7A2E2E]">
-                      {c.prize || "—"}
-                    </td>
-                    <td className="p-3 text-[11px] text-[#666666]">
-                      {c.used_at ? new Date(c.used_at).toLocaleString() : "—"}
-                    </td>
-                    <td className="p-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCode(c.id)}
-                        className="p-1 text-[#888888] hover:text-red-700 transition-colors"
-                        title="Delete Code"
+                codes
+                  .filter((c) => {
+                    if (!searchTerm) return true;
+                    const q = searchTerm.toLowerCase();
+                    return (
+                      (c.card_number && String(c.card_number).includes(q)) ||
+                      c.code.toLowerCase().includes(q) ||
+                      (c.prize && c.prize.toLowerCase().includes(q))
+                    );
+                  })
+                  .map((c) => {
+                    const prizeName = c.prize || "—";
+                    const isTV = prizeName.toLowerCase() === "tv";
+                    const isMilestone = ["tv", "special gift", "bt speaker", "headphone", "earbuds"].includes(prizeName.toLowerCase());
+
+                    return (
+                      <tr
+                        key={c.id || c.code}
+                        className={`hover:bg-[#F8F8F6]/60 transition-colors ${
+                          isTV ? "bg-amber-50/50" : ""
+                        }`}
                       >
-                        <Trash2 size={13} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                        <td className="p-3 text-center font-bold text-[#8A6A44]">
+                          #{c.card_number || "—"}
+                        </td>
+                        <td className="p-3 font-mono font-black text-sm text-[#222222] tracking-wider">
+                          {c.code}
+                        </td>
+                        <td className="p-3 font-bold">
+                          {isTV ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-200 text-amber-900 border border-amber-300 font-extrabold shadow-xs">
+                              👑 TV (GRAND PRIZE)
+                            </span>
+                          ) : isMilestone ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-rose-100 text-[#7A2E2E] border border-rose-200 font-bold">
+                              🎁 {prizeName}
+                            </span>
+                          ) : (
+                            <span className="text-[#555555] font-medium">
+                              {prizeName}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          {c.used ? (
+                            <span className="bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+                              Claimed
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+                              Available
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-[11px] text-[#666666]">
+                          {c.used_at ? new Date(c.used_at).toLocaleString() : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })
               )}
             </tbody>
           </table>

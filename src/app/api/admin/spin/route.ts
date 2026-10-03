@@ -37,14 +37,30 @@ export async function GET(request: NextRequest) {
       supabase.from("spin_settings").select("*").eq("id", "global").maybeSingle(),
       supabase.from("spin_rewards").select("*").order("created_at", { ascending: true }),
       supabase.from("spin_stats").select("*").eq("id", "global").maybeSingle(),
-      supabase.from("spin_codes").select("*").order("created_at", { ascending: false }).limit(100),
+      supabase.from("spin_codes").select("*").order("card_number", { ascending: true }).limit(200),
     ]);
+
+    let codes = [];
+    if (!codesRes.error && codesRes.data && codesRes.data.length > 0) {
+      codes = codesRes.data;
+    } else {
+      // Fallback to preassigned list
+      const { PREASSIGNED_SPIN_CODES } = await import("@/data/spinCodesData");
+      codes = PREASSIGNED_SPIN_CODES.map((item) => ({
+        id: `card-${item.card}`,
+        card_number: item.card,
+        code: item.code,
+        prize: item.prize,
+        used: false,
+        used_at: null,
+      }));
+    }
 
     return NextResponse.json({
       settings: settingsRes.data || { id: "global", is_active: true },
       rewards: rewardsRes.data || [],
       stats: statsRes.data || { id: "global", total_spins: 0 },
-      codes: codesRes.data || [],
+      codes,
     });
   } catch (error: any) {
     console.error("[GET /api/admin/spin error]", error);

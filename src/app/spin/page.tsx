@@ -200,7 +200,7 @@ export default function SpinWheelPage() {
                       setCode(e.target.value.toUpperCase());
                       setErrorMsg("");
                     }}
-                    placeholder="e.g. MAA100"
+                    placeholder="e.g. MR-48291"
                     disabled={isSpinning}
                     required
                     className="w-full bg-white border border-[#D5D5D0] px-4 py-3.5 text-base font-mono font-bold text-[#222222] tracking-widest placeholder:text-[#AAAAAA] focus:outline-none focus:border-[#7A2E2E] transition-colors"
@@ -254,15 +254,7 @@ export default function SpinWheelPage() {
               <span className="font-bold text-[#222222] block mb-1">
                 How to get spin codes?
               </span>
-              Codes are issued to customers with salon appointments or product purchases. Test codes:{" "}
-              <code className="bg-white border px-1.5 py-0.5 font-bold text-[#7A2E2E] rounded">
-                MAA100
-              </code>{" "}
-              or{" "}
-              <code className="bg-white border px-1.5 py-0.5 font-bold text-[#7A2E2E] rounded">
-                LUCKY2026
-              </code>
-              .
+              Unique cards are handed out with purchases at Maa Radio. Enter the secret code printed on your card (e.g. <span className="font-mono font-bold text-[#7A2E2E]">MR-XXXXX</span>) to claim your assured prize.
             </div>
           </div>
         </div>

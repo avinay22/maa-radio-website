@@ -15,6 +15,7 @@ export interface SpinReward {
 
 export interface SpinCode {
   id: string;
+  card_number?: number | null;
   code: string;
   used: boolean;
   prize: string | null;
