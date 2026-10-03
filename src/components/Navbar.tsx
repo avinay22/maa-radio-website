@@ -12,6 +12,7 @@ const navLinks = [
   { name: "Home", href: "/" },
   { name: "Products", href: "/products" },
   { name: "Accessories", href: "/accessories" },
+  { name: "Spin & Win 🎁", href: "/spin" },
   { name: "About", href: "/about" },
   { name: "Contact", href: "/contact" },
 ];

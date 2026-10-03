@@ -15,8 +15,9 @@ import {
 } from "@/lib/apiClient";
 import { formatPrice, calculateProductPricing } from "@/components/ProductCard";
 import { createClient } from "@/lib/supabase/client";
+import SpinWheelAdminTab from "@/components/admin/SpinWheelAdminTab";
 
-type Tab = "business" | "categories" | "offers" | "gallery" | "products";
+type Tab = "business" | "categories" | "offers" | "gallery" | "products" | "spin";
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -1209,6 +1210,7 @@ const TABS: { id: Tab; label: string; Icon: React.ElementType }[] = [
   { id: "offers", label: "Offers & Deals", Icon: Tag },
   { id: "gallery", label: "Shop Gallery", Icon: Image },
   { id: "products", label: "Products Catalog", Icon: Package },
+  { id: "spin", label: "Spin Wheel", Icon: Sparkles },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1402,6 +1404,7 @@ export default function AdminPage() {
           {activeTab === "offers" && <OffersTab content={content} setContent={setContent} token={token} />}
           {activeTab === "gallery" && <GalleryTab content={content} setContent={setContent} token={token} />}
           {activeTab === "products" && <ProductsTab categories={content.categories} token={token} />}
+          {activeTab === "spin" && <SpinWheelAdminTab token={token} />}
         </main>
       </div>
     </div>
