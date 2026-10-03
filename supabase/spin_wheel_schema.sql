@@ -37,21 +37,20 @@ CREATE TABLE IF NOT EXISTS public.spin_rewards (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Seed default initial rewards if table is empty
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.spin_rewards) THEN
-    INSERT INTO public.spin_rewards (reward_name, milestone, type, enabled)
-    VALUES
-      ('Flat ₹100 OFF', NULL, 'random', true),
-      ('10% OFF Coupon', NULL, 'random', true),
-      ('Free Screen Guard', NULL, 'random', true),
-      ('5% Extra Discount', NULL, 'random', true),
-      ('Better Luck Next Time', NULL, 'random', true),
-      ('Surprise Gift Box', NULL, 'random', true),
-      ('Jackpot: ₹1000 OFF', 10, 'milestone', true);
-  END IF;
-END $$;
+-- Populate the exact rewards:
+-- Milestone: TV (101), Special Gift (30), BT Speaker (20), Headphone (15), Earbuds (5)
+-- Random: Brand Cup, Neckband, Data Cable
+DELETE FROM public.spin_rewards;
+INSERT INTO public.spin_rewards (reward_name, milestone, type, enabled)
+VALUES
+  ('TV', 101, 'milestone', true),
+  ('Special Gift', 30, 'milestone', true),
+  ('BT Speaker', 20, 'milestone', true),
+  ('Headphone', 15, 'milestone', true),
+  ('Earbuds', 5, 'milestone', true),
+  ('Brand Cup', NULL, 'random', true),
+  ('Neckband', NULL, 'random', true),
+  ('Data Cable', NULL, 'random', true);
 
 -- 4. spin_codes table (stores unique access codes, status, and won prize)
 CREATE TABLE IF NOT EXISTS public.spin_codes (

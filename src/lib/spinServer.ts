@@ -19,12 +19,14 @@ let memoryState = {
   isActive: true,
   totalSpins: 0,
   rewards: [
-    { id: "1", reward_name: "Flat ₹100 OFF", milestone: null, type: "random", enabled: true },
-    { id: "2", reward_name: "10% OFF Coupon", milestone: null, type: "random", enabled: true },
-    { id: "3", reward_name: "Free Screen Guard", milestone: null, type: "random", enabled: true },
-    { id: "4", reward_name: "5% Extra Discount", milestone: null, type: "random", enabled: true },
-    { id: "5", reward_name: "Better Luck Next Time", milestone: null, type: "random", enabled: true },
-    { id: "6", reward_name: "Jackpot: ₹1000 OFF", milestone: 10, type: "milestone", enabled: true },
+    { id: "1", reward_name: "TV", milestone: 101, type: "milestone", enabled: true },
+    { id: "2", reward_name: "Special Gift", milestone: 30, type: "milestone", enabled: true },
+    { id: "3", reward_name: "BT Speaker", milestone: 20, type: "milestone", enabled: true },
+    { id: "4", reward_name: "Headphone", milestone: 15, type: "milestone", enabled: true },
+    { id: "5", reward_name: "Earbuds", milestone: 5, type: "milestone", enabled: true },
+    { id: "6", reward_name: "Brand Cup", milestone: null, type: "random", enabled: true },
+    { id: "7", reward_name: "Neckband", milestone: null, type: "random", enabled: true },
+    { id: "8", reward_name: "Data Cable", milestone: null, type: "random", enabled: true },
   ] as SpinReward[],
   codes: new Map<string, { used: boolean; prize: string | null; used_at: string | null }>([
     ["MAA100", { used: false, prize: null, used_at: null }],
@@ -34,13 +36,100 @@ let memoryState = {
   ]),
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Core Milestone & Reward Selection Logic
+// ─────────────────────────────────────────────────────────────────────────────
+async function resolveSpinReward(
+  supabase: any,
+  totalSpins: number,
+  allRewards: SpinReward[]
+): Promise<SpinReward> {
+  const enabledRewards = allRewards.filter((r) => r.enabled);
+
+  const findReward = (name: string, milestone?: number) => {
+    return enabledRewards.find(
+      (r) =>
+        r.reward_name.trim().toLowerCase() === name.toLowerCase() ||
+        (milestone !== undefined && r.milestone === milestone)
+    );
+  };
+
+  let milestoneReward: SpinReward | undefined;
+
+  // 1. total_spins === 101 → TV (ONLY ONCE)
+  if (totalSpins === 101) {
+    let tvAlreadyGiven = false;
+    if (supabase) {
+      try {
+        const { data: tvGiven } = await supabase
+          .from("spin_codes")
+          .select("id")
+          .ilike("prize", "TV")
+          .limit(1);
+        if (tvGiven && tvGiven.length > 0) {
+          tvAlreadyGiven = true;
+        }
+      } catch {
+        // Continue if query error
+      }
+    } else {
+      tvAlreadyGiven = Array.from(memoryState.codes.values()).some(
+        (c) => c.prize?.toLowerCase() === "tv"
+      );
+    }
+
+    if (!tvAlreadyGiven) {
+      milestoneReward = findReward("TV", 101);
+    }
+  }
+  // 2. total_spins === 30 → Special Gift
+  else if (totalSpins === 30) {
+    milestoneReward = findReward("Special Gift", 30);
+  }
+  // 3. total_spins === 20 → BT Speaker
+  else if (totalSpins === 20) {
+    milestoneReward = findReward("BT Speaker", 20);
+  }
+  // 4. total_spins === 15 → Headphone
+  else if (totalSpins === 15) {
+    milestoneReward = findReward("Headphone", 15);
+  }
+  // 5. total_spins === 5 → Earbuds
+  else if (totalSpins === 5) {
+    milestoneReward = findReward("Earbuds", 5);
+  }
+  // 6. Custom milestone from admin if defined
+  else {
+    milestoneReward = enabledRewards.find(
+      (r) =>
+        r.type === "milestone" &&
+        r.milestone === totalSpins &&
+        r.reward_name.toLowerCase() !== "tv"
+    );
+  }
+
+  // If milestone matched, return it
+  if (milestoneReward) {
+    return milestoneReward;
+  }
+
+  // If no milestone matched → give random reward from Brand Cup, Neckband, Data Cable
+  const randomPool = enabledRewards.filter((r) => r.type === "random");
+  const pool = randomPool.length > 0 ? randomPool : enabledRewards;
+  const randomIndex = Math.floor(Math.random() * pool.length);
+  return pool[randomIndex];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public Wheel Status
+// ─────────────────────────────────────────────────────────────────────────────
 export async function getSpinPublicStatus() {
   try {
     const supabase = getSupabaseBackend();
 
     const [settingsRes, rewardsRes, statsRes] = await Promise.all([
       supabase.from("spin_settings").select("is_active").eq("id", "global").maybeSingle(),
-      supabase.from("spin_rewards").select("id, reward_name, type").eq("enabled", true).order("created_at", { ascending: true }),
+      supabase.from("spin_rewards").select("id, reward_name, type, milestone").eq("enabled", true).order("created_at", { ascending: true }),
       supabase.from("spin_stats").select("total_spins").eq("id", "global").maybeSingle(),
     ]);
 
@@ -50,7 +139,7 @@ export async function getSpinPublicStatus() {
         isActive: settingsRes.data?.is_active ?? true,
         rewards: rewardsRes.data && rewardsRes.data.length > 0
           ? rewardsRes.data
-          : memoryState.rewards.map(r => ({ id: r.id, reward_name: r.reward_name, type: r.type })),
+          : memoryState.rewards.map((r) => ({ id: r.id, reward_name: r.reward_name, type: r.type, milestone: r.milestone })),
         totalSpins: statsRes.data?.total_spins || 0,
         source: "supabase",
       };
@@ -62,12 +151,15 @@ export async function getSpinPublicStatus() {
   // Graceful fallback if table is not yet created
   return {
     isActive: memoryState.isActive,
-    rewards: memoryState.rewards.filter(r => r.enabled).map(r => ({ id: r.id, reward_name: r.reward_name, type: r.type })),
+    rewards: memoryState.rewards.filter((r) => r.enabled).map((r) => ({ id: r.id, reward_name: r.reward_name, type: r.type, milestone: r.milestone })),
     totalSpins: memoryState.totalSpins,
     source: "local_fallback",
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Process Spin Play (Backend Control)
+// ─────────────────────────────────────────────────────────────────────────────
 export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse> {
   const code = (codeRaw || "").trim().toUpperCase();
   if (!code) {
@@ -119,7 +211,7 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
         return { ok: false, error: "No active rewards configured at the moment." };
       }
 
-      // 5. Increment total_spins
+      // 5. Increment total_spins by 1
       let nextTotal = 1;
       const { data: statsRow } = await supabase
         .from("spin_stats")
@@ -139,34 +231,15 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
           .upsert({ id: "global", total_spins: nextTotal, updated_at: new Date().toISOString() });
       }
 
-      // 6. Reward Logic: Check Milestone vs Random
-      let winningReward: SpinReward | null = null;
-
-      // Check if any milestone reward matches current spin number or interval
-      const milestoneRewards = (rewards as SpinReward[]).filter(
-        (r) => r.type === "milestone" && r.milestone && r.milestone > 0
-      );
-
-      const matchedMilestone = milestoneRewards.find(
-        (r) => r.milestone === nextTotal || (r.milestone! > 1 && nextTotal % r.milestone! === 0)
-      );
-
-      if (matchedMilestone) {
-        winningReward = matchedMilestone;
-      } else {
-        // Random selection from enabled random rewards
-        const randomRewards = (rewards as SpinReward[]).filter((r) => r.type === "random");
-        const pool = randomRewards.length > 0 ? randomRewards : (rewards as SpinReward[]);
-        const randomIndex = Math.floor(Math.random() * pool.length);
-        winningReward = pool[randomIndex];
-      }
-
+      // 6. Reward Logic: Check Milestone First (TV at 101, Special Gift at 30, BT Speaker at 20, Headphone at 15, Earbuds at 5)
+      // Otherwise random from (Brand Cup, Neckband, Data Cable)
+      const winningReward = await resolveSpinReward(supabase, nextTotal, rewards as SpinReward[]);
       const prizeName = winningReward.reward_name;
 
-      // Find index in the original list for wheel animation alignment
-      const sliceIndex = rewards.findIndex((r) => r.id === winningReward!.id);
+      // Find slice index in the visual rewards array for accurate wheel alignment
+      const sliceIndex = rewards.findIndex((r) => r.id === winningReward.id);
 
-      // 7. Mark Code as Used & Record Prize
+      // 7. Mark Code as Used & Record Prize in Database
       await supabase
         .from("spin_codes")
         .update({
@@ -188,7 +261,7 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
     console.warn("[processSpinPlay DB exception, using fallback]:", err?.message);
   }
 
-  // Local in-memory execution fallback (works even before user runs SQL migration!)
+  // Local fallback (if offline or DB not yet created)
   if (!memoryState.isActive) {
     return { ok: false, error: "Spin the Wheel is currently inactive." };
   }
@@ -208,31 +281,20 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
   memoryState.totalSpins += 1;
   const currentTotal = memoryState.totalSpins;
 
-  const enabledRewards = memoryState.rewards.filter((r) => r.enabled);
-  const matchedMilestone = enabledRewards.find(
-    (r) => r.type === "milestone" && r.milestone && (r.milestone === currentTotal || currentTotal % r.milestone === 0)
-  );
-
-  let selected: SpinReward;
-  if (matchedMilestone) {
-    selected = matchedMilestone;
-  } else {
-    const randomPool = enabledRewards.filter((r) => r.type === "random");
-    const pool = randomPool.length > 0 ? randomPool : enabledRewards;
-    selected = pool[Math.floor(Math.random() * pool.length)];
-  }
+  const winningReward = await resolveSpinReward(null, currentTotal, memoryState.rewards);
 
   existingCode.used = true;
-  existingCode.prize = selected.reward_name;
+  existingCode.prize = winningReward.reward_name;
   existingCode.used_at = new Date().toISOString();
 
-  const sliceIdx = enabledRewards.findIndex((r) => r.id === selected.id);
+  const enabledList = memoryState.rewards.filter((r) => r.enabled);
+  const sliceIdx = enabledList.findIndex((r) => r.id === winningReward.id);
 
   return {
     ok: true,
-    prize: selected.reward_name,
+    prize: winningReward.reward_name,
     sliceIndex: sliceIdx >= 0 ? sliceIdx : 0,
-    rewardId: selected.id,
+    rewardId: winningReward.id,
     totalSpins: currentTotal,
   };
 }
