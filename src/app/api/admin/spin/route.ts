@@ -171,6 +171,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // 6. Toggle Code Used (e.g. make unclaimed again)
+    if (action === "toggle_code_used") {
+      const { id, code, used } = body;
+      const targetUsed = Boolean(used);
+
+      if (!code && !id) {
+        return NextResponse.json({ error: "Code or ID required." }, { status: 400 });
+      }
+
+      let query = supabase.from("spin_codes").update({
+        used: targetUsed,
+        used_at: targetUsed ? new Date().toISOString() : null,
+      });
+
+      if (id && !String(id).startsWith("card-")) {
+        query = query.eq("id", id);
+      } else if (code) {
+        query = query.ilike("code", String(code).trim());
+      }
+
+      const { error } = await query;
+      if (error && !error.message?.includes("does not exist")) {
+        throw new Error(error.message);
+      }
+
+      const { markCodeUsedInMemory } = await import("@/lib/spinServer");
+      if (code) markCodeUsedInMemory(code, targetUsed);
+
+      return NextResponse.json({ ok: true, used: targetUsed });
+    }
+
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (error: any) {
     console.error("[POST /api/admin/spin error]", error);

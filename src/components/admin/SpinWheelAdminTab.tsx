@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import {
   RotateCw, Plus, Trash2, Edit2, CheckCircle, AlertCircle,
-  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw, Printer, Search
+  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw, Printer, Search, RotateCcw
 } from "lucide-react";
 import { SpinReward, SpinCode, SpinSettings, SpinStats } from "@/lib/spinTypes";
 
@@ -219,6 +219,35 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
       showNotification("Code deleted.");
     } catch (err: any) {
       setErrorMsg(err?.message);
+    }
+  };
+
+  // 6. Toggle Code Claimed / Unclaimed Status
+  const handleToggleCodeStatus = async (code: string, id: string, nextUsed: boolean) => {
+    setCodes((prev) =>
+      prev.map((c) =>
+        c.code === code
+          ? { ...c, used: nextUsed, used_at: nextUsed ? new Date().toISOString() : null }
+          : c
+      )
+    );
+
+    try {
+      const res = await fetch("/api/admin/spin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: "toggle_code_used", id, code, used: nextUsed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update code status.");
+
+      showNotification(`Card ${code} marked as ${nextUsed ? "CLAIMED" : "AVAILABLE (UNCLAIMED)"}`);
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Failed to update status.");
+      loadData();
     }
   };
 
@@ -569,6 +598,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
                 <th className="p-3">Pre-Assigned Prize</th>
                 <th className="p-3 text-center">Status</th>
                 <th className="p-3">Redeemed At</th>
+                <th className="p-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E2DF]">
@@ -635,6 +665,28 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
                         </td>
                         <td className="p-3 text-[11px] text-[#666666]">
                           {c.used_at ? new Date(c.used_at).toLocaleString() : "—"}
+                        </td>
+                        <td className="p-3 text-center">
+                          {c.used ? (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCodeStatus(c.code, c.id, false)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-colors shadow-xs cursor-pointer"
+                              title="Reset code so customer can spin again"
+                            >
+                              <RotateCcw size={11} />
+                              Make Unclaimed
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCodeStatus(c.code, c.id, true)}
+                              className="text-[10px] text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                              title="Manually mark as claimed"
+                            >
+                              Mark Claimed
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );

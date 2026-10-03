@@ -14,7 +14,7 @@ interface WheelCanvasProps {
   isSpinning: boolean;
 }
 
-// Brand color palette matching Maa Radio's luxury salon/retail aesthetic
+// Brand color palette matching Maa Radio's premium electronics retail aesthetic
 const SLICE_COLORS = [
   "#7A2E2E", // Royal Maroon
   "#8A6A44", // Antique Gold

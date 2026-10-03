@@ -230,3 +230,13 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
     totalSpins: memoryState.totalSpins,
   };
 }
+
+export function markCodeUsedInMemory(codeRaw: string, used: boolean) {
+  const code = (codeRaw || "").trim().toUpperCase();
+  const item = memoryState.codes.get(code);
+  if (item) {
+    item.used = used;
+    item.used_at = used ? new Date().toISOString() : null;
+  }
+}
+
