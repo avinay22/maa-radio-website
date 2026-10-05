@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from "react";
 import {
   RotateCw, Plus, Trash2, Edit2, CheckCircle, AlertCircle,
-  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw, Printer, Search, RotateCcw
+  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw, Printer, Search, RotateCcw, ImageIcon, Image as ImageIcon2
 } from "lucide-react";
 import { SpinReward, SpinCode, SpinSettings, SpinStats } from "@/lib/spinTypes";
+import ImageUploader from "@/components/ImageUploader";
 
 export default function SpinWheelAdminTab({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
   // Reward Edit Form state
   const [editingRewardId, setEditingRewardId] = useState<string | null>(null);
   const [rewardName, setRewardName] = useState("");
+  const [rewardImageUrl, setRewardImageUrl] = useState("");
   const [rewardType, setRewardType] = useState<"random" | "milestone">("random");
   const [rewardMilestone, setRewardMilestone] = useState<string>("");
   const [rewardEnabled, setRewardEnabled] = useState(true);
@@ -80,7 +82,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
       if (!res.ok) throw new Error(data.error || "Failed to update toggle.");
 
       setSettings({ ...settings, is_active: nextState });
-      showNotification(`Spin Wheel is now ${nextState ? "ACTIVE (ON)" : "PAUSED (OFF)}"}`);
+      showNotification(`Spin Wheel is now ${nextState ? "ACTIVE (ON)" : "PAUSED (OFF)"}`);
     } catch (err: any) {
       setErrorMsg(err?.message);
     } finally {
@@ -88,7 +90,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
     }
   };
 
-  // 2. Save / Update Reward
+  // 2. Save / Update Reward (Names & Photos)
   const handleSaveReward = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rewardName.trim()) {
@@ -102,6 +104,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
       const payload = {
         id: editingRewardId || undefined,
         reward_name: rewardName.trim(),
+        image_url: rewardImageUrl.trim() || null,
         type: rewardType,
         milestone: rewardType === "milestone" ? parseInt(rewardMilestone, 10) || 10 : null,
         enabled: rewardEnabled,
@@ -121,7 +124,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
       // Refresh list
       await loadData();
       resetRewardForm();
-      showNotification("Reward saved successfully!");
+      showNotification("Reward saved successfully with updated name and photo!");
     } catch (err: any) {
       setErrorMsg(err?.message);
     } finally {
@@ -132,6 +135,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
   const handleEditReward = (reward: SpinReward) => {
     setEditingRewardId(reward.id);
     setRewardName(reward.reward_name);
+    setRewardImageUrl(reward.image_url || "");
     setRewardType(reward.type);
     setRewardMilestone(reward.milestone ? String(reward.milestone) : "");
     setRewardEnabled(reward.enabled);
@@ -140,6 +144,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
   const resetRewardForm = () => {
     setEditingRewardId(null);
     setRewardName("");
+    setRewardImageUrl("");
     setRewardType("random");
     setRewardMilestone("");
     setRewardEnabled(true);
@@ -369,19 +374,75 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
           <form onSubmit={handleSaveReward} className="space-y-4">
             <div>
               <label className="block text-[10px] font-bold uppercase text-[#666666] tracking-wider mb-1">
-                Reward Label *
+                Product Name on Wheel *
               </label>
               <input
                 type="text"
                 value={rewardName}
                 onChange={(e) => setRewardName(e.target.value)}
-                placeholder="e.g. Flat ₹150 OFF, Free Hair Serum"
+                placeholder="e.g. Smart LED TV, Wireless Earbuds, Brand Cup"
                 required
-                className="w-full bg-white border border-[#D5D5D0] px-3 py-2 text-sm text-[#222222] focus:outline-none focus:border-[#7A2E2E]"
+                className="w-full bg-white border border-[#D5D5D0] px-3.5 py-2.5 rounded-xl text-sm text-[#222222] focus:outline-none focus:border-[#7A2E2E] shadow-xs"
               />
+              <span className="text-[10px] text-[#888888] mt-1 block">
+                Editing this name updates the wheel slice and winning scratch cards automatically.
+              </span>
             </div>
 
-            <div>
+            {/* Product Photo Option */}
+            <div className="space-y-2 pt-1 border-t border-[#EAEAE6]">
+              <div className="flex items-center justify-between">
+                <label className="block text-[10px] font-bold uppercase text-[#666666] tracking-wider">
+                  Product Photo (On Wheel Slice)
+                </label>
+                {rewardImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setRewardImageUrl("")}
+                    className="text-[10px] text-red-600 hover:text-red-800 font-bold uppercase"
+                  >
+                    Remove Photo
+                  </button>
+                )}
+              </div>
+
+              {rewardImageUrl && (
+                <div className="flex items-center gap-3 p-2.5 bg-white border border-slate-200 rounded-xl">
+                  <img
+                    src={rewardImageUrl}
+                    alt="Preview"
+                    className="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-200 p-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate">
+                      Photo Ready
+                    </p>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      {rewardImageUrl}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <ImageUploader
+                value={rewardImageUrl}
+                onChange={(val) => setRewardImageUrl(val)}
+                label="Upload Photo from Device"
+                aspectHint="square"
+              />
+
+              <div className="pt-1">
+                <input
+                  type="url"
+                  value={rewardImageUrl}
+                  onChange={(e) => setRewardImageUrl(e.target.value)}
+                  placeholder="Or paste direct image URL (https://...)"
+                  className="w-full bg-white border border-[#D5D5D0] px-3 py-2 rounded-lg text-xs text-[#222222] focus:outline-none focus:border-[#7A2E2E]"
+                />
+              </div>
+            </div>
+
+            <div className="pt-1 border-t border-[#EAEAE6]">
               <label className="block text-[10px] font-bold uppercase text-[#666666] tracking-wider mb-1">
                 Reward Type
               </label>
@@ -389,7 +450,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => setRewardType("random")}
-                  className={`py-2 px-3 text-xs font-bold uppercase rounded border transition-colors cursor-pointer ${
+                  className={`py-2 px-3 text-xs font-bold uppercase rounded-xl border transition-colors cursor-pointer ${
                     rewardType === "random"
                       ? "bg-[#7A2E2E] text-white border-[#7A2E2E]"
                       : "bg-white text-[#666666] border-[#D5D5D0]"
@@ -400,7 +461,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => setRewardType("milestone")}
-                  className={`py-2 px-3 text-xs font-bold uppercase rounded border transition-colors cursor-pointer ${
+                  className={`py-2 px-3 text-xs font-bold uppercase rounded-xl border transition-colors cursor-pointer ${
                     rewardType === "milestone"
                       ? "bg-[#8A6A44] text-white border-[#8A6A44]"
                       : "bg-white text-[#666666] border-[#D5D5D0]"
@@ -423,10 +484,10 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
                   onChange={(e) => setRewardMilestone(e.target.value)}
                   placeholder="e.g. 10 (awards on every 10th spin)"
                   required
-                  className="w-full bg-white border border-[#D5D5D0] px-3 py-2 text-sm text-[#222222] focus:outline-none focus:border-[#7A2E2E]"
+                  className="w-full bg-white border border-[#D5D5D0] px-3 py-2 rounded-xl text-sm text-[#222222] focus:outline-none focus:border-[#7A2E2E]"
                 />
                 <span className="text-[10px] text-[#888888] mt-1 block">
-                  Example: 10 = Given on spin #10, #20, #30 etc.
+                  Example: 101 for TV, 30 for Special Gift, etc.
                 </span>
               </div>
             )}
@@ -448,15 +509,15 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-3 bg-[#7A2E2E] hover:bg-[#5F2222] disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                className="flex-1 py-3 bg-[#7A2E2E] hover:bg-[#5F2222] disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-sm"
               >
-                {saving ? "Saving…" : editingRewardId ? "Update Reward" : "Add Reward"}
+                {saving ? "Saving…" : editingRewardId ? "Update Reward & Photo" : "Add Reward Slice"}
               </button>
               {editingRewardId && (
                 <button
                   type="button"
                   onClick={resetRewardForm}
-                  className="px-4 py-3 border border-[#D5D5D0] text-[#666666] hover:bg-white text-xs font-bold uppercase"
+                  className="px-4 py-3 border border-[#D5D5D0] text-[#666666] hover:bg-white text-xs font-bold uppercase rounded-xl"
                 >
                   Cancel
                 </button>
@@ -476,11 +537,12 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
             </span>
           </div>
 
-          <div className="border border-[#E2E2DF] overflow-hidden rounded-xl bg-white shadow-xs">
+          <div className="border border-[#E2E2DF] overflow-hidden rounded-2xl bg-white shadow-xs">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8F8F6] border-b border-[#E2E2DF] text-[#222222] uppercase tracking-wider font-bold">
                 <tr>
-                  <th className="p-3">Reward Name</th>
+                  <th className="p-3 w-14">Photo</th>
+                  <th className="p-3">Product / Prize Name</th>
                   <th className="p-3">Type</th>
                   <th className="p-3 text-center">Status</th>
                   <th className="p-3 text-center">Actions</th>
@@ -489,15 +551,31 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
               <tbody className="divide-y divide-[#E2E2DF]">
                 {rewards.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="p-8 text-center text-xs text-[#888888] italic">
+                    <td colSpan={5} className="p-8 text-center text-xs text-[#888888] italic">
                       No rewards configured yet. Add your first slice on the left.
                     </td>
                   </tr>
                 ) : (
                   rewards.map((r) => (
                     <tr key={r.id} className="hover:bg-[#F8F8F6]/60 transition-colors">
+                      <td className="p-3">
+                        {r.image_url ? (
+                          <img
+                            src={r.image_url}
+                            alt={r.reward_name}
+                            className="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-200 p-0.5 shadow-xs"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-400">
+                            <ImageIcon size={16} />
+                          </div>
+                        )}
+                      </td>
                       <td className="p-3 font-bold text-[#222222]">
-                        {r.reward_name}
+                        <div>{r.reward_name}</div>
+                        {!r.image_url && (
+                          <span className="text-[9px] text-amber-600 block mt-0.5">Click edit to add photo</span>
+                        )}
                       </td>
                       <td className="p-3">
                         {r.type === "milestone" ? (
@@ -512,7 +590,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
                       </td>
                       <td className="p-3 text-center">
                         <span
-                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                             r.enabled
                               ? "bg-emerald-100 text-emerald-800"
                               : "bg-gray-100 text-gray-600"
@@ -525,18 +603,18 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
                         <button
                           type="button"
                           onClick={() => handleEditReward(r)}
-                          className="p-1.5 text-[#666666] hover:text-[#7A2E2E] transition-colors"
-                          title="Edit Reward"
+                          className="p-1.5 text-[#666666] hover:text-[#7A2E2E] transition-colors rounded-lg hover:bg-slate-100"
+                          title="Edit Reward & Photo"
                         >
-                          <Edit2 size={13} />
+                          <Edit2 size={14} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteReward(r.id)}
-                          className="p-1.5 text-[#666666] hover:text-red-700 transition-colors"
+                          className="p-1.5 text-[#666666] hover:text-red-700 transition-colors rounded-lg hover:bg-slate-100"
                           title="Delete Reward"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>

@@ -2,14 +2,19 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sparkles, Gift, AlertCircle, CheckCircle2, ArrowRight, RotateCw, Volume2, ShieldCheck } from "lucide-react";
+import {
+  Sparkles, Gift, AlertCircle, CheckCircle2, ArrowRight, RotateCw,
+  ShieldCheck, MessageSquare, Trophy, Smartphone, Zap
+} from "lucide-react";
 import WheelCanvas from "@/components/SpinWheel/WheelCanvas";
 import ConfettiEffect from "@/components/SpinWheel/ConfettiEffect";
 
 interface RewardItem {
   id: string;
   reward_name: string;
+  image_url?: string | null;
   type: "random" | "milestone";
+  milestone?: number | null;
 }
 
 export default function SpinWheelPage() {
@@ -51,7 +56,7 @@ export default function SpinWheelPage() {
 
     const trimmedCode = code.trim().toUpperCase();
     if (!trimmedCode) {
-      setErrorMsg("Please enter your spin code.");
+      setErrorMsg("Please enter your card spin code.");
       return;
     }
 
@@ -80,7 +85,7 @@ export default function SpinWheelPage() {
       const targetSlice = typeof data.sliceIndex === "number" ? data.sliceIndex : 0;
       const sliceCenter = targetSlice * sliceAngle + sliceAngle / 2;
 
-      // 5 full spins (1800deg) + offset to align pointer at 12 o'clock
+      // 6 full spins (2160deg) + offset to align pointer at 12 o'clock
       const currentFullSpins = Math.floor(rotation / 360);
       const nextSpins = (currentFullSpins + 6) * 360;
       const finalAngle = nextSpins + (360 - sliceCenter);
@@ -102,12 +107,27 @@ export default function SpinWheelPage() {
     }
   };
 
+  // Find won reward details for modal
+  const wonReward = winningResult
+    ? rewards.find(
+        (r) =>
+          r.reward_name.trim().toLowerCase() === winningResult.prize.trim().toLowerCase() ||
+          winningResult.prize.trim().toLowerCase().includes(r.reward_name.trim().toLowerCase())
+      )
+    : null;
+
+  const whatsappClaimUrl = winningResult
+    ? `https://wa.me/917002733658?text=${encodeURIComponent(
+        `Hello Maa Radio Mart! I won the prize "${winningResult.prize}" on your Lucky Spin Wheel using card code ${winningResult.code}. Please verify and guide me to claim it!`
+      )}`
+    : "#";
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8F8F6] pt-32 pb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 pt-32 pb-20 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#7A2E2E] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-bold uppercase tracking-wider text-[#666666]">
+          <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-300">
             Loading Lucky Wheel…
           </p>
         </div>
@@ -118,22 +138,22 @@ export default function SpinWheelPage() {
   // If Admin has toggled OFF
   if (!isActive) {
     return (
-      <div className="min-h-screen bg-[#F8F8F6] pt-32 pb-20 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white border border-[#E2E2DF] p-8 md:p-10 text-center shadow-sm">
-          <div className="w-16 h-16 bg-[#7A2E2E]/10 border border-[#7A2E2E]/20 text-[#7A2E2E] flex items-center justify-center rounded-full mx-auto mb-6">
+      <div className="min-h-screen bg-slate-950 pt-32 pb-20 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 md:p-10 text-center shadow-2xl rounded-3xl">
+          <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center rounded-2xl mx-auto mb-6">
             <Gift size={28} />
           </div>
-          <h1 className="text-xl font-extrabold text-[#222222] tracking-tight uppercase mb-2">
+          <h1 className="text-xl font-extrabold text-white tracking-tight uppercase mb-2">
             Spin Wheel Paused
           </h1>
-          <p className="text-xs text-[#666666] leading-relaxed mb-6">
-            The Lucky Spin event is currently paused by store management. Please stay tuned or check back during our next festival promotion!
+          <p className="text-xs text-slate-400 leading-relaxed mb-6">
+            The Lucky Spin event is currently paused by store management. Please stay tuned or check back during our next celebration promotion!
           </p>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#7A2E2E] hover:bg-[#5F2222] text-white text-xs font-bold uppercase tracking-wider transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md"
           >
-            Browse Products <ArrowRight size={14} />
+            Browse Store Products <ArrowRight size={14} />
           </Link>
         </div>
       </div>
@@ -141,56 +161,72 @@ export default function SpinWheelPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFDFC] pt-28 pb-20 px-4 md:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-[#0B0F19] to-slate-950 text-slate-100 pt-28 pb-20 px-4 md:px-8 relative overflow-hidden">
       <ConfettiEffect active={showConfetti} />
+
+      {/* Atmospheric Stage Lighting & Glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-tr from-amber-500/15 via-rose-500/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-sky-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
       <div className="max-w-6xl mx-auto">
         {/* Header Banner */}
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#8A6A44]/10 border border-[#8A6A44]/20 text-[#8A6A44] text-[10px] font-bold uppercase tracking-widest mb-3 rounded-full">
-            <Sparkles size={12} />
-            Exclusive Customer Giveaway
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-bold uppercase tracking-widest mb-3 rounded-full shadow-sm backdrop-blur-sm">
+            <Sparkles size={12} className="text-amber-400 animate-pulse" />
+            <span>Maa Radio Exclusive Customer Giveaway</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold text-[#222222] tracking-tight mb-3">
-            Lucky Spin & Win
+          <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 tracking-tight mb-3">
+            Grand Lucky Spin &amp; Win
           </h1>
-          <p className="text-xs md:text-sm text-[#666666] leading-relaxed">
-            Enter your secret spin access code below, spin the luxury wheel, and unlock assured rewards, discounts, and gift items.
+          <p className="text-xs md:text-sm text-slate-400 leading-relaxed max-w-lg mx-auto">
+            Scratch your secret store card, enter your code below, and spin the flagship wheel to win genuine smartphones, TVs, speakers, and premium electronics!
           </p>
         </div>
 
         {/* Main Grid: Wheel + Controls */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-white border border-[#E2E2DF] p-6 md:p-12 shadow-sm rounded-2xl">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-900/80 border border-slate-800/90 p-6 md:p-10 shadow-2xl rounded-3xl backdrop-blur-md">
           {/* Wheel Display */}
-          <div className="lg:col-span-7 flex flex-col items-center justify-center py-4">
+          <div className="lg:col-span-7 flex flex-col items-center justify-center py-2">
             <WheelCanvas
               slices={rewards}
               rotation={rotation}
               isSpinning={isSpinning}
             />
-            <p className="text-[11px] text-[#888888] font-medium tracking-wide mt-4 uppercase flex items-center gap-1.5">
-              <ShieldCheck size={14} className="text-[#8A6A44]" />
-              Fair & Verified Randomized Rewards
-            </p>
+            <div className="flex items-center gap-3 mt-4 text-[11px] text-slate-400 font-medium tracking-wide">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <ShieldCheck size={14} /> 100% Certified Genuine Rewards
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <Trophy size={14} /> Single-Use Code Protected
+              </span>
+            </div>
           </div>
 
           {/* Controls & Form */}
-          <div className="lg:col-span-5 bg-[#F8F8F6] border border-[#E2E2DF] p-6 md:p-8 rounded-xl">
-            <div className="flex items-center gap-2 mb-4">
-              <Gift size={18} className="text-[#7A2E2E]" />
-              <h2 className="text-base font-bold text-[#222222] uppercase tracking-wider">
-                Claim Your Spin
-              </h2>
+          <div className="lg:col-span-5 bg-slate-950/90 border border-slate-800 p-6 md:p-8 rounded-2xl shadow-inner">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Gift size={18} />
+              </div>
+              <div>
+                <h2 className="text-sm font-extrabold text-white uppercase tracking-wider">
+                  Unlock Your Reward
+                </h2>
+                <span className="text-[10px] text-slate-400 block">
+                  One spin per valid scratch card code
+                </span>
+              </div>
             </div>
 
-            <p className="text-xs text-[#666666] mb-6 leading-relaxed">
-              Received a coupon code from our store or invoice? Enter it below. Each unique code is valid for one spin.
+            <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+              Enter the unique code printed on your customer scratch card (e.g. <span className="font-mono font-bold text-amber-300">MR-XXXXX</span>) to trigger the wheel.
             </p>
 
             <form onSubmit={handleSpin} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold uppercase text-[#666666] tracking-wider mb-1.5">
-                  Enter Spin Code *
+                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1.5">
+                  Your Scratch Card Code *
                 </label>
                 <div className="relative">
                   <input
@@ -203,13 +239,13 @@ export default function SpinWheelPage() {
                     placeholder="e.g. MR-48291"
                     disabled={isSpinning}
                     required
-                    className="w-full bg-white border border-[#D5D5D0] px-4 py-3.5 text-base font-mono font-bold text-[#222222] tracking-widest placeholder:text-[#AAAAAA] focus:outline-none focus:border-[#7A2E2E] transition-colors"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3.5 text-base font-mono font-bold text-white tracking-widest placeholder:text-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50 transition-all shadow-inner"
                   />
                   {code && !isSpinning && (
                     <button
                       type="button"
                       onClick={() => setCode("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#999999] hover:text-[#222222]"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
                     >
                       Clear
                     </button>
@@ -219,8 +255,8 @@ export default function SpinWheelPage() {
 
               {/* Error Message */}
               {errorMsg && (
-                <div className="flex items-start gap-2 text-[#7A2E2E] bg-[#7A2E2E]/10 border border-[#7A2E2E]/30 p-3 rounded text-xs font-semibold">
-                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2 text-rose-300 bg-rose-950/50 border border-rose-800/60 p-3 rounded-xl text-xs font-medium animate-in fade-in">
+                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5 text-rose-400" />
                   <span>{errorMsg}</span>
                 </div>
               )}
@@ -229,82 +265,144 @@ export default function SpinWheelPage() {
               <button
                 type="submit"
                 disabled={isSpinning || !code.trim()}
-                className={`w-full py-4 text-xs font-bold uppercase tracking-widest text-white transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer ${
+                className={`w-full py-4 text-xs font-black uppercase tracking-widest text-slate-950 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer ${
                   isSpinning
-                    ? "bg-[#8A6A44] cursor-not-allowed opacity-90"
-                    : "bg-[#7A2E2E] hover:bg-[#5F2222] active:scale-[0.99]"
+                    ? "bg-amber-600 cursor-not-allowed opacity-90"
+                    : "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:brightness-110 active:scale-[0.98]"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isSpinning ? (
                   <>
-                    <RotateCw size={15} className="animate-spin" />
-                    Spinning The Wheel…
+                    <RotateCw size={16} className="animate-spin text-slate-950" />
+                    <span>Spinning The Wheel…</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={15} />
-                    SPIN NOW
+                    <Sparkles size={16} className="text-slate-950" />
+                    <span>SPIN THE WHEEL</span>
                   </>
                 )}
               </button>
             </form>
 
-            {/* Test Helper Tip */}
-            <div className="mt-6 pt-5 border-t border-[#E2E2DF] text-[11px] text-[#777777]">
-              <span className="font-bold text-[#222222] block mb-1">
-                How to get spin codes?
-              </span>
-              Unique cards are handed out with purchases at Maa Radio. Enter the secret code printed on your card (e.g. <span className="font-mono font-bold text-[#7A2E2E]">MR-XXXXX</span>) to claim your assured prize.
+            {/* Verification Note */}
+            <div className="mt-6 pt-5 border-t border-slate-800 text-[11px] text-slate-500 leading-relaxed">
+              <strong className="text-slate-300 block mb-1">
+                Where do I get my spin card?
+              </strong>
+              Collect your complimentary lucky spin card with purchases at Maa Radio Mart in Gogamukh, Assam. Each card guarantees an exciting tech reward!
             </div>
           </div>
         </div>
+
+        {/* Live Prizes Showcase Strip */}
+        {rewards.length > 0 && (
+          <div className="mt-12 pt-8 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                  Available Wheel Prizes ({rewards.length})
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Every slice carries an assured gift or electronics giveaway.
+                </p>
+              </div>
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full uppercase tracking-wider">
+                Assured Winning
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+              {rewards.map((r) => (
+                <div
+                  key={r.id}
+                  className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col items-center text-center shadow-xs hover:border-slate-700 transition-all group"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-slate-950 border border-slate-800 p-1 mb-2 flex items-center justify-center overflow-hidden">
+                    {r.image_url ? (
+                      <img
+                        src={r.image_url}
+                        alt={r.reward_name}
+                        className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <Gift size={20} className="text-amber-400" />
+                    )}
+                  </div>
+                  <span className="text-xs font-bold text-slate-200 line-clamp-1">
+                    {r.reward_name}
+                  </span>
+                  <span className="text-[9px] text-slate-500 mt-1 uppercase font-semibold">
+                    {r.type === "milestone" ? `Milestone #${r.milestone}` : "Lucky Draw"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Winning Result Modal */}
+      {/* Winning Result Celebratory Modal */}
       {winningResult && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-[#8A6A44] max-w-md w-full p-8 text-center shadow-2xl rounded-2xl relative animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-[#8A6A44]/10 border border-[#8A6A44]/30 rounded-full flex items-center justify-center mx-auto mb-4 text-[#8A6A44]">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-slate-900 border-2 border-amber-400/80 max-w-md w-full p-8 text-center shadow-2xl rounded-3xl relative animate-in zoom-in-95 duration-300">
+            {/* Celebration Icon */}
+            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-950 shadow-lg shadow-amber-500/30">
               <Sparkles size={32} />
             </div>
 
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#8A6A44] bg-[#8A6A44]/10 px-3 py-1 rounded-full">
-              Congratulations!
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3.5 py-1 rounded-full">
+              ★ WINNER CONGRATULATIONS ★
             </span>
 
-            <h3 className="text-2xl md:text-3xl font-extrabold text-[#222222] tracking-tight mt-3 mb-2">
-              You Won!
+            <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight mt-3 mb-1">
+              You Just Won!
             </h3>
 
-            <div className="my-5 p-5 bg-[#F8F8F6] border border-[#E2E2DF] rounded-xl">
-              <p className="text-xs uppercase text-[#666666] tracking-wider mb-1 font-bold">
-                Your Prize
+            {/* Prize Box with Image */}
+            <div className="my-5 p-5 bg-slate-950/90 border border-slate-800 rounded-2xl flex flex-col items-center">
+              {wonReward?.image_url && (
+                <div className="w-24 h-24 rounded-2xl bg-slate-900 border border-slate-800 p-2 mb-3 flex items-center justify-center shadow-inner">
+                  <img
+                    src={wonReward.image_url}
+                    alt={winningResult.prize}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+              )}
+
+              <p className="text-[10px] uppercase text-slate-400 tracking-widest font-bold mb-1">
+                Your Official Reward
               </p>
-              <p className="text-2xl font-black text-[#7A2E2E] tracking-wide">
+              <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-400 tracking-wide">
                 {winningResult.prize}
               </p>
-              <p className="text-[10px] text-[#888888] mt-2">
-                Redeemed via code: <span className="font-mono font-bold text-[#222222]">{winningResult.code}</span>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Redeemed via card: <span className="font-mono font-bold text-white bg-slate-800 px-2 py-0.5 rounded">{winningResult.code}</span>
               </p>
             </div>
 
-            <p className="text-xs text-[#666666] mb-6 leading-relaxed">
-              Show this screen or quote your code to our team to claim your discount or reward on your next order!
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              Take a screenshot of this winning screen or tap the WhatsApp button below to instantly claim your reward with store owner Avinay Sharma!
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/products"
-                className="flex-1 py-3 bg-[#7A2E2E] hover:bg-[#5F2222] text-white text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 rounded-lg"
+            <div className="flex flex-col gap-2.5">
+              <a
+                href={whatsappClaimUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 cursor-pointer"
               >
-                Use On Products <ArrowRight size={14} />
-              </Link>
+                <MessageSquare size={16} />
+                Claim Reward on WhatsApp
+              </a>
+
               <button
                 type="button"
                 onClick={() => setWinningResult(null)}
-                className="py-3 px-5 border border-[#D5D5D0] text-[#666666] hover:bg-[#F8F8F6] text-xs font-bold uppercase tracking-wider rounded-lg"
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
               >
-                Close
+                Close &amp; Keep Playing
               </button>
             </div>
           </div>

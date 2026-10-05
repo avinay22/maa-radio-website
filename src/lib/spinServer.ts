@@ -15,19 +15,44 @@ export function getSupabaseBackend() {
   return createClient(url, key);
 }
 
+export const DEFAULT_REWARD_IMAGES: Record<string, string> = {
+  "TV": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=300&auto=format&fit=crop&q=80",
+  "Special Gift": "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=300&auto=format&fit=crop&q=80",
+  "BT Speaker": "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=300&auto=format&fit=crop&q=80",
+  "Headphone": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&auto=format&fit=crop&q=80",
+  "Earbuds": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80",
+  "Cup": "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80",
+  "Brand Cup": "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80",
+  "Neckband": "https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?w=300&auto=format&fit=crop&q=80",
+  "Data Cable": "https://images.unsplash.com/photo-1588508065123-287b28e013da?w=300&auto=format&fit=crop&q=80",
+};
+
+export function resolveRewardImage(rewardName: string, customImage?: string | null): string {
+  if (customImage && customImage.trim()) return customImage.trim();
+  const trimmed = (rewardName || "").trim();
+  if (DEFAULT_REWARD_IMAGES[trimmed]) return DEFAULT_REWARD_IMAGES[trimmed];
+  const lower = trimmed.toLowerCase();
+  for (const [key, url] of Object.entries(DEFAULT_REWARD_IMAGES)) {
+    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
+      return url;
+    }
+  }
+  return "";
+}
+
 // In-memory fallback if database migration hasn't been executed yet
 const memoryState = {
   isActive: true,
   totalSpins: 0,
   rewards: [
-    { id: "1", reward_name: "TV", milestone: 101, type: "milestone", enabled: true },
-    { id: "2", reward_name: "Special Gift", milestone: 30, type: "milestone", enabled: true },
-    { id: "3", reward_name: "BT Speaker", milestone: 20, type: "milestone", enabled: true },
-    { id: "4", reward_name: "Headphone", milestone: 15, type: "milestone", enabled: true },
-    { id: "5", reward_name: "Earbuds", milestone: 5, type: "milestone", enabled: true },
-    { id: "6", reward_name: "Cup", milestone: null, type: "random", enabled: true },
-    { id: "7", reward_name: "Neckband", milestone: null, type: "random", enabled: true },
-    { id: "8", reward_name: "Data Cable", milestone: null, type: "random", enabled: true },
+    { id: "1", reward_name: "TV", image_url: DEFAULT_REWARD_IMAGES["TV"], milestone: 101, type: "milestone", enabled: true },
+    { id: "2", reward_name: "Special Gift", image_url: DEFAULT_REWARD_IMAGES["Special Gift"], milestone: 30, type: "milestone", enabled: true },
+    { id: "3", reward_name: "BT Speaker", image_url: DEFAULT_REWARD_IMAGES["BT Speaker"], milestone: 20, type: "milestone", enabled: true },
+    { id: "4", reward_name: "Headphone", image_url: DEFAULT_REWARD_IMAGES["Headphone"], milestone: 15, type: "milestone", enabled: true },
+    { id: "5", reward_name: "Earbuds", image_url: DEFAULT_REWARD_IMAGES["Earbuds"], milestone: 5, type: "milestone", enabled: true },
+    { id: "6", reward_name: "Cup", image_url: DEFAULT_REWARD_IMAGES["Cup"], milestone: null, type: "random", enabled: true },
+    { id: "7", reward_name: "Neckband", image_url: DEFAULT_REWARD_IMAGES["Neckband"], milestone: null, type: "random", enabled: true },
+    { id: "8", reward_name: "Data Cable", image_url: DEFAULT_REWARD_IMAGES["Data Cable"], milestone: null, type: "random", enabled: true },
   ] as SpinReward[],
   codes: new Map<string, { card: number; prize: string; used: boolean; used_at: string | null }>(
     PREASSIGNED_SPIN_CODES.map((item) => [
@@ -44,16 +69,31 @@ export async function getSpinPublicStatus() {
   try {
     const supabase = getSupabaseBackend();
 
-    const [settingsRes, rewardsRes, statsRes] = await Promise.all([
+    const [settingsRes, rewardsRes, statsRes, contentRes] = await Promise.all([
       supabase.from("spin_settings").select("is_active").eq("id", "global").maybeSingle(),
-      supabase.from("spin_rewards").select("id, reward_name, type, milestone").eq("enabled", true).order("created_at", { ascending: true }),
+      supabase.from("spin_rewards").select("*").eq("enabled", true).order("created_at", { ascending: true }),
       supabase.from("spin_stats").select("total_spins").eq("id", "global").maybeSingle(),
+      supabase.from("site_content").select("data").limit(1).maybeSingle(),
     ]);
 
+    const storedRewardImages: Record<string, string> =
+      (contentRes.data?.data && typeof contentRes.data.data === "object" && (contentRes.data.data as any).spinRewardImages) || {};
+
     if (!settingsRes.error && !rewardsRes.error && rewardsRes.data && rewardsRes.data.length > 0) {
+      const enrichedRewards = rewardsRes.data.map((r: any) => ({
+        id: r.id,
+        reward_name: r.reward_name,
+        type: r.type,
+        milestone: r.milestone,
+        image_url: resolveRewardImage(
+          r.reward_name,
+          r.image_url || storedRewardImages[r.id] || storedRewardImages[r.reward_name]
+        ),
+      }));
+
       return {
         isActive: settingsRes.data?.is_active ?? true,
-        rewards: rewardsRes.data,
+        rewards: enrichedRewards,
         totalSpins: statsRes.data?.total_spins || 0,
         source: "supabase",
       };
@@ -65,7 +105,13 @@ export async function getSpinPublicStatus() {
   // Graceful fallback
   return {
     isActive: memoryState.isActive,
-    rewards: memoryState.rewards.filter((r) => r.enabled),
+    rewards: memoryState.rewards.filter((r) => r.enabled).map((r) => ({
+      id: r.id,
+      reward_name: r.reward_name,
+      type: r.type,
+      milestone: r.milestone,
+      image_url: resolveRewardImage(r.reward_name, r.image_url),
+    })),
     totalSpins: memoryState.totalSpins,
     source: "local_fallback",
   };

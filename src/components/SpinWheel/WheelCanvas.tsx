@@ -2,10 +2,12 @@
 
 import React, { useMemo } from "react";
 
-interface WheelSlice {
+export interface WheelSlice {
   id: string;
   reward_name: string;
+  image_url?: string | null;
   type?: string;
+  milestone?: number | null;
 }
 
 interface WheelCanvasProps {
@@ -14,16 +16,16 @@ interface WheelCanvasProps {
   isSpinning: boolean;
 }
 
-// Brand color palette matching Maa Radio's premium electronics retail aesthetic
+// Jewel-tone palette for a luxury electronics giveaway wheel
 const SLICE_COLORS = [
-  "#7A2E2E", // Royal Maroon
-  "#8A6A44", // Antique Gold
-  "#222222", // Deep Charcoal
-  "#9E3838", // Vivid Crimson
-  "#B38E5D", // Warm Gold
-  "#3A3A3A", // Slate Dark
-  "#612222", // Dark Maroon
-  "#C5A880", // Champagne Gold
+  "#881337", // Royal Ruby Crimson
+  "#1E3A8A", // Deep Sapphire Blue
+  "#78350F", // Burnished Gold Amber
+  "#065F46", // Imperial Emerald Green
+  "#581C87", // Regal Amethyst
+  "#0F766E", // Deep Peacock Teal
+  "#1E293B", // Midnight Slate
+  "#9F1239", // Vivid Crimson Rose
 ];
 
 export default function WheelCanvas({
@@ -33,8 +35,9 @@ export default function WheelCanvas({
 }: WheelCanvasProps) {
   const count = slices.length || 1;
   const sliceAngle = 360 / count;
-  const radius = 180;
-  const center = 200;
+  const viewBoxSize = 460;
+  const center = viewBoxSize / 2; // 230
+  const radius = 195; // Radius of pie slices
 
   // Generate SVG path for a circular pie slice
   const slicePaths = useMemo(() => {
@@ -50,27 +53,51 @@ export default function WheelCanvas({
       const largeArcFlag = sliceAngle > 180 ? 1 : 0;
       const pathData = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
 
-      const midAngle = (i * sliceAngle + sliceAngle / 2);
+      const midAngle = i * sliceAngle + sliceAngle / 2;
       const color = SLICE_COLORS[i % SLICE_COLORS.length];
 
+      // Format text: split into two lines if multi-word or long
+      const words = slice.reward_name.trim().split(/\s+/);
+      let line1 = slice.reward_name;
+      let line2 = "";
+
+      if (words.length >= 2) {
+        line1 = words[0];
+        line2 = words.slice(1).join(" ");
+      } else if (slice.reward_name.length > 9) {
+        line1 = slice.reward_name.substring(0, 8);
+        line2 = slice.reward_name.substring(8);
+      }
+
       return {
+        id: slice.id || `slice-${i}`,
         pathData,
         color,
         midAngle,
         text: slice.reward_name,
+        line1,
+        line2,
+        imageUrl: slice.image_url || "",
       };
     });
   }, [slices, sliceAngle, center, radius, count]);
 
   return (
-    <div className="relative w-full max-w-[380px] sm:max-w-[420px] aspect-square mx-auto flex items-center justify-center p-4">
-      {/* Outer Glow & Metallic Ring */}
-      <div className="absolute inset-2 rounded-full border-8 border-[#C5A880]/30 shadow-[0_0_50px_rgba(138,106,68,0.25)] pointer-events-none" />
+    <div className="relative w-full max-w-[390px] sm:max-w-[450px] aspect-square mx-auto flex items-center justify-center p-3 select-none">
+      {/* Outer Glow Halo */}
+      <div className="absolute inset-1 rounded-full bg-gradient-to-tr from-amber-500/20 via-rose-500/15 to-amber-500/20 blur-xl pointer-events-none" />
 
-      {/* Top Fixed Pointer Arrow (12 o'clock) */}
-      <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center">
-        <div className="w-6 h-8 bg-gradient-to-b from-[#8A6A44] via-[#F4E8D1] to-[#7A2E2E] shadow-xl clip-pointer [clip-path:polygon(50%_100%,0%_0%,100%_0%)]" />
-        <div className="w-3 h-3 rounded-full bg-[#7A2E2E] border-2 border-white -mt-1 shadow-md" />
+      {/* Outer Metallic Gold Trim Ring */}
+      <div className="absolute inset-2 rounded-full border-4 border-[#F59E0B]/40 shadow-[0_0_35px_rgba(245,158,11,0.25)] pointer-events-none" />
+
+      {/* Top Fixed Pointer (12 o'clock) with 3D drop shadow */}
+      <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
+        {/* Golden Arrowhead Needle */}
+        <div className="w-8 h-10 bg-gradient-to-b from-[#FDE68A] via-[#F59E0B] to-[#991B1B] shadow-[0_8px_16px_rgba(0,0,0,0.5)] [clip-path:polygon(50%_100%,0%_0%,100%_0%)] filter drop-shadow-md" />
+        {/* Ruby Jewel Cap */}
+        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-rose-500 to-red-950 border-2 border-amber-300 -mt-1.5 shadow-md flex items-center justify-center">
+          <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />
+        </div>
       </div>
 
       {/* Rotating Wheel Container */}
@@ -79,108 +106,245 @@ export default function WheelCanvas({
         style={{
           transform: `rotate(${rotation}deg)`,
           transition: isSpinning
-            ? "transform 5s cubic-bezier(0.15, 0.9, 0.2, 1.0)"
+            ? "transform 5s cubic-bezier(0.12, 0.95, 0.15, 1.0)"
             : "none",
         }}
       >
         <svg
-          viewBox="0 0 400 400"
-          className="w-full h-full drop-shadow-2xl select-none"
+          viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
+          className="w-full h-full drop-shadow-2xl overflow-visible"
         >
           <defs>
-            <radialGradient id="hubGradient" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#F5E6CA" />
-              <stop offset="60%" stopColor="#8A6A44" />
-              <stop offset="100%" stopColor="#553A1B" />
+            {/* Center Gold Radial Gradient */}
+            <radialGradient id="goldHubGrad" cx="45%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#FFFBEB" />
+              <stop offset="35%" stopColor="#FDE68A" />
+              <stop offset="65%" stopColor="#D97706" />
+              <stop offset="100%" stopColor="#78350F" />
             </radialGradient>
-            <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3" />
+
+            {/* Bezel Ring Gradient */}
+            <linearGradient id="bezelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#2A1B0E" />
+              <stop offset="50%" stopColor="#111827" />
+              <stop offset="100%" stopColor="#3E2713" />
+            </linearGradient>
+
+            {/* General Drop Shadow Filter */}
+            <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.45" />
             </filter>
+
+            {/* Text Glow Shadow */}
+            <filter id="wheelTextShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.8" />
+            </filter>
+
+            {/* Circular ClipPaths for slice images */}
+            {slicePaths.map((slice, i) => (
+              <clipPath key={`clip-${i}`} id={`slice-badge-clip-${i}`}>
+                <circle cx={center} cy="86" r="20" />
+              </clipPath>
+            ))}
           </defs>
 
-          {/* Outer Wheel Rim */}
+          {/* Outer Wheel Rim / Frame */}
           <circle
             cx={center}
             cy={center}
-            r={radius + 12}
-            fill="#1A1A1A"
-            stroke="#8A6A44"
-            strokeWidth="6"
+            r={radius + 18}
+            fill="url(#bezelGrad)"
+            stroke="#F59E0B"
+            strokeWidth="5"
+          />
+          <circle
+            cx={center}
+            cy={center}
+            r={radius + 6}
+            fill="none"
+            stroke="#D97706"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+            opacity="0.6"
           />
 
-          {/* Decorative Rim Lights/Dots */}
-          {Array.from({ length: 24 }).map((_, idx) => {
-            const angle = (idx * (360 / 24) * Math.PI) / 180;
-            const cx = center + (radius + 6) * Math.cos(angle);
-            const cy = center + (radius + 6) * Math.sin(angle);
+          {/* Decorative Cabochon LED Lights around rim */}
+          {Array.from({ length: 32 }).map((_, idx) => {
+            const angle = (idx * (360 / 32) * Math.PI) / 180;
+            const cx = center + (radius + 10) * Math.cos(angle);
+            const cy = center + (radius + 10) * Math.sin(angle);
+            const isGold = idx % 2 === 0;
+
             return (
-              <circle
-                key={idx}
-                cx={cx}
-                cy={cy}
-                r="3"
-                fill={idx % 2 === 0 ? "#F8F8F6" : "#8A6A44"}
-              />
+              <g key={`light-${idx}`}>
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r="3.5"
+                  fill={isGold ? "#FDE68A" : "#FFFFFF"}
+                  stroke={isGold ? "#B45309" : "#9CA3AF"}
+                  strokeWidth="0.8"
+                />
+                {/* Specular bulb gleam */}
+                <circle
+                  cx={cx - 1}
+                  cy={cy - 1}
+                  r="1"
+                  fill="#FFFFFF"
+                  opacity="0.9"
+                />
+              </g>
             );
           })}
 
           {/* Wheel Slices */}
           {slicePaths.map((slice, i) => (
-            <g key={i}>
+            <g key={`slice-${i}`}>
+              {/* Pie Wedge Path */}
               <path
                 d={slice.pathData}
                 fill={slice.color}
                 stroke="#FFFFFF"
-                strokeWidth="1.5"
+                strokeWidth="1.8"
               />
-              {/* Rotated Text along the slice radius */}
-              <g
-                transform={`rotate(${slice.midAngle}, ${center}, ${center})`}
-              >
-                <text
-                  x={center}
-                  y={center - radius * 0.62}
-                  fill="#FFFFFF"
-                  fontSize={count > 8 ? "10" : "12"}
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  transform={`rotate(90, ${center}, ${center - radius * 0.62})`}
-                  className="font-sans tracking-wide drop-shadow-sm uppercase select-none pointer-events-none"
-                >
-                  {slice.text.length > 18
-                    ? `${slice.text.substring(0, 16)}…`
-                    : slice.text}
-                </text>
+
+              {/* Rotated Group: Oriented outward along the slice's central radius */}
+              <g transform={`rotate(${slice.midAngle}, ${center}, ${center})`}>
+                
+                {/* 1. PRODUCT PHOTO BADGE (Medallion near rim at y=86) */}
+                <g filter="url(#badgeShadow)">
+                  {/* Outer Gold Ring */}
+                  <circle
+                    cx={center}
+                    cy="86"
+                    r="22.5"
+                    fill="#FFFFFF"
+                    stroke="#F59E0B"
+                    strokeWidth="2.5"
+                  />
+
+                  {/* Inner Crisp Product Image */}
+                  {slice.imageUrl ? (
+                    <image
+                      href={slice.imageUrl}
+                      x={center - 20}
+                      y={66}
+                      width="40"
+                      height="40"
+                      preserveAspectRatio="xMidYMid slice"
+                      clipPath={`url(#slice-badge-clip-${i})`}
+                    />
+                  ) : (
+                    /* Fallback Icon Badge if no image uploaded yet */
+                    <g transform={`translate(${center - 12}, 74)`}>
+                      <rect
+                        width="24"
+                        height="24"
+                        rx="4"
+                        fill="#FEF3C7"
+                      />
+                      <circle cx="12" cy="12" r="6" fill="#D97706" />
+                    </g>
+                  )}
+
+                  {/* Subtle glass gloss highlight over image */}
+                  <ellipse
+                    cx={center}
+                    cy="75"
+                    rx="14"
+                    ry="6"
+                    fill="#FFFFFF"
+                    opacity="0.25"
+                    pointerEvents="none"
+                  />
+                </g>
+
+                {/* 2. PRODUCT NAME TEXT (Positioned horizontally below photo) */}
+                <g filter="url(#wheelTextShadow)">
+                  {slice.line2 ? (
+                    <text
+                      x={center}
+                      y="132"
+                      fill="#FFFFFF"
+                      fontSize="10"
+                      fontWeight="900"
+                      textAnchor="middle"
+                      className="font-sans uppercase tracking-wider select-none pointer-events-none"
+                    >
+                      <tspan x={center} dy="0">
+                        {slice.line1.length > 10 ? `${slice.line1.substring(0, 9)}.` : slice.line1}
+                      </tspan>
+                      <tspan x={center} dy="12" fontSize="9.5" fill="#FEF08A">
+                        {slice.line2.length > 10 ? `${slice.line2.substring(0, 9)}.` : slice.line2}
+                      </tspan>
+                    </text>
+                  ) : (
+                    <text
+                      x={center}
+                      y="136"
+                      fill="#FFFFFF"
+                      fontSize="10.5"
+                      fontWeight="900"
+                      textAnchor="middle"
+                      className="font-sans uppercase tracking-wider select-none pointer-events-none"
+                    >
+                      {slice.line1.length > 13 ? `${slice.line1.substring(0, 11)}..` : slice.line1}
+                    </text>
+                  )}
+                </g>
               </g>
             </g>
           ))}
 
-          {/* Central Golden Hub */}
+          {/* Central Multi-Tier Golden Hub */}
+          {/* Outer Bevel */}
           <circle
             cx={center}
             cy={center}
-            r="38"
-            fill="url(#hubGradient)"
+            r="44"
+            fill="url(#goldHubGrad)"
             stroke="#FFFFFF"
-            strokeWidth="3"
-            filter="url(#shadow)"
+            strokeWidth="3.5"
+            filter="url(#badgeShadow)"
           />
+          {/* Inner Accent Ring */}
           <circle
             cx={center}
             cy={center}
-            r="24"
-            fill="#7A2E2E"
-            stroke="#8A6A44"
+            r="32"
+            fill="#78350F"
+            stroke="#FDE68A"
             strokeWidth="2"
           />
+          {/* Ruby Core */}
+          <circle
+            cx={center}
+            cy={center}
+            r="26"
+            fill="#881337"
+            stroke="#D97706"
+            strokeWidth="2"
+          />
+          {/* Center Text / Brand Star */}
           <text
             x={center}
-            y={center + 4}
-            fill="#FFFFFF"
+            y={center - 3}
+            fill="#FDE68A"
             fontSize="10"
             fontWeight="900"
             textAnchor="middle"
-            className="tracking-widest uppercase select-none pointer-events-none"
+            className="tracking-widest uppercase select-none pointer-events-none font-sans"
+          >
+            MAA
+          </text>
+          <text
+            x={center}
+            y={center + 8}
+            fill="#FFFFFF"
+            fontSize="8"
+            fontWeight="800"
+            textAnchor="middle"
+            className="tracking-widest uppercase select-none pointer-events-none font-sans"
           >
             SPIN
           </text>

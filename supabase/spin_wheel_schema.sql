@@ -29,11 +29,15 @@ ON CONFLICT (id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS public.spin_rewards (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   reward_name text NOT NULL,
+  image_url text DEFAULT NULL,
   milestone integer DEFAULT NULL,
   type text NOT NULL DEFAULT 'random',
   enabled boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure image_url column exists if table already existed previously
+ALTER TABLE public.spin_rewards ADD COLUMN IF NOT EXISTS image_url text DEFAULT NULL;
 
 DELETE FROM public.spin_rewards;
 INSERT INTO public.spin_rewards (reward_name, milestone, type, enabled)

@@ -7,6 +7,7 @@ export interface SpinSettings {
 export interface SpinReward {
   id: string;
   reward_name: string;
+  image_url?: string | null;
   milestone: number | null;
   type: "random" | "milestone";
   enabled: boolean;
@@ -34,6 +35,7 @@ export interface SpinStatusResponse {
   rewards: Array<{
     id: string;
     reward_name: string;
+    image_url?: string | null;
     type: "random" | "milestone";
   }>;
   totalSpins: number;

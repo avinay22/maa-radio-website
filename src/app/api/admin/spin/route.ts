@@ -33,12 +33,25 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseBackend();
 
-    const [settingsRes, rewardsRes, statsRes, codesRes] = await Promise.all([
+    const [settingsRes, rewardsRes, statsRes, codesRes, contentRes] = await Promise.all([
       supabase.from("spin_settings").select("*").eq("id", "global").maybeSingle(),
       supabase.from("spin_rewards").select("*").order("created_at", { ascending: true }),
       supabase.from("spin_stats").select("*").eq("id", "global").maybeSingle(),
       supabase.from("spin_codes").select("*").order("card_number", { ascending: true }).limit(200),
+      supabase.from("site_content").select("data").limit(1).maybeSingle(),
     ]);
+
+    const { resolveRewardImage } = await import("@/lib/spinServer");
+    const storedRewardImages: Record<string, string> =
+      (contentRes.data?.data && typeof contentRes.data.data === "object" && (contentRes.data.data as any).spinRewardImages) || {};
+
+    const rewards = (rewardsRes.data || []).map((r: any) => ({
+      ...r,
+      image_url: resolveRewardImage(
+        r.reward_name,
+        r.image_url || storedRewardImages[r.id] || storedRewardImages[r.reward_name]
+      ),
+    }));
 
     let codes = [];
     if (!codesRes.error && codesRes.data && codesRes.data.length > 0) {
@@ -58,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       settings: settingsRes.data || { id: "global", is_active: true },
-      rewards: rewardsRes.data || [],
+      rewards,
       stats: statsRes.data || { id: "global", total_spins: 0 },
       codes,
     });
@@ -95,30 +108,110 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, settings: data });
     }
 
-    // 2. Save / Update Reward
+    // 2. Save / Update Reward (with Name & Photo / Image editing)
     if (action === "save_reward") {
       const reward = body.reward;
       if (!reward || !reward.reward_name) {
         return NextResponse.json({ error: "Reward name is required." }, { status: 400 });
       }
 
-      const payload = {
-        reward_name: String(reward.reward_name).trim(),
+      const newRewardName = String(reward.reward_name).trim();
+      const imageUrl = reward.image_url ? String(reward.image_url).trim() : "";
+
+      const payload: Record<string, any> = {
+        reward_name: newRewardName,
         type: reward.type === "milestone" ? "milestone" : "random",
         milestone: reward.type === "milestone" && reward.milestone ? parseInt(reward.milestone, 10) : null,
         enabled: reward.enabled !== undefined ? Boolean(reward.enabled) : true,
       };
 
-      let query;
-      if (reward.id && !reward.id.startsWith("new-")) {
-        query = supabase.from("spin_rewards").update(payload).eq("id", reward.id).select().single();
-      } else {
-        query = supabase.from("spin_rewards").insert(payload).select().single();
+      // Check if updating an existing reward
+      let oldRewardName: string | null = null;
+      let targetId = reward.id;
+
+      if (targetId && !targetId.startsWith("new-")) {
+        const { data: existing } = await supabase
+          .from("spin_rewards")
+          .select("reward_name")
+          .eq("id", targetId)
+          .maybeSingle();
+        if (existing?.reward_name) {
+          oldRewardName = existing.reward_name;
+        }
       }
 
-      const { data, error } = await query;
-      if (error) throw new Error(error.message);
-      return NextResponse.json({ ok: true, reward: data });
+      // 1. Try to save to spin_rewards (with image_url if column exists)
+      let savedData: any = null;
+      try {
+        const payloadWithImg = { ...payload, image_url: imageUrl || null };
+        let query;
+        if (targetId && !targetId.startsWith("new-")) {
+          query = supabase.from("spin_rewards").update(payloadWithImg).eq("id", targetId).select().single();
+        } else {
+          query = supabase.from("spin_rewards").insert(payloadWithImg).select().single();
+        }
+        const { data, error } = await query;
+        if (!error && data) {
+          savedData = data;
+        } else {
+          throw error;
+        }
+      } catch {
+        // Fallback without image_url column if not yet created in table
+        let fallbackQuery;
+        if (targetId && !targetId.startsWith("new-")) {
+          fallbackQuery = supabase.from("spin_rewards").update(payload).eq("id", targetId).select().single();
+        } else {
+          fallbackQuery = supabase.from("spin_rewards").insert(payload).select().single();
+        }
+        const { data, error } = await fallbackQuery;
+        if (error) throw new Error(error.message);
+        savedData = data;
+      }
+
+      const rewardId = savedData?.id || targetId || "temp";
+
+      // 2. Also persist photo in site_content.data.spinRewardImages for 100% reliable image loading
+      if (imageUrl !== undefined) {
+        try {
+          const { data: contentRow } = await supabase.from("site_content").select("data").limit(1).maybeSingle();
+          if (contentRow) {
+            const currentData = contentRow.data || {};
+            const spinRewardImages = { ...(currentData.spinRewardImages || {}) };
+            spinRewardImages[rewardId] = imageUrl;
+            spinRewardImages[newRewardName] = imageUrl;
+            if (oldRewardName && oldRewardName !== newRewardName) {
+              delete spinRewardImages[oldRewardName];
+            }
+            await supabase.from("site_content").update({
+              data: { ...currentData, spinRewardImages },
+              updated_at: new Date().toISOString(),
+            }).limit(1);
+          }
+        } catch (imgErr) {
+          console.warn("[save_reward] site_content spinRewardImages sync warning:", imgErr);
+        }
+      }
+
+      // 3. If reward name changed, keep all spin_codes in sync with the new reward name!
+      if (oldRewardName && oldRewardName !== newRewardName) {
+        try {
+          await supabase
+            .from("spin_codes")
+            .update({ prize: newRewardName })
+            .ilike("prize", oldRewardName);
+        } catch (codeSyncErr) {
+          console.warn("[save_reward] spin_codes prize rename warning:", codeSyncErr);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        reward: {
+          ...savedData,
+          image_url: imageUrl || savedData?.image_url,
+        },
+      });
     }
 
     // 3. Delete Reward
