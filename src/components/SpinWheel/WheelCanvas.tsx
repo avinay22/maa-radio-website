@@ -14,6 +14,7 @@ interface WheelCanvasProps {
   slices: WheelSlice[];
   rotation: number;
   isSpinning: boolean;
+  onSpinClick?: () => void;
 }
 
 // Jewel-tone palette for a luxury electronics giveaway wheel
@@ -32,6 +33,7 @@ export default function WheelCanvas({
   slices,
   rotation,
   isSpinning,
+  onSpinClick,
 }: WheelCanvasProps) {
   const count = slices.length || 1;
   const sliceAngle = 360 / count;
@@ -102,7 +104,12 @@ export default function WheelCanvas({
 
       {/* Rotating Wheel Container */}
       <div
-        className="w-full h-full relative"
+        onClick={() => {
+          if (!isSpinning && onSpinClick) {
+            onSpinClick();
+          }
+        }}
+        className={`w-full h-full relative ${onSpinClick && !isSpinning ? "cursor-pointer active:scale-[0.99] transition-transform" : ""}`}
         style={{
           transform: `rotate(${rotation}deg)`,
           transition: isSpinning

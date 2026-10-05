@@ -22,6 +22,10 @@ export default function SpinWheelPage() {
   const [isActive, setIsActive] = useState(true);
   const [rewards, setRewards] = useState<RewardItem[]>([]);
   const [code, setCode] = useState("");
+  const [requireCode, setRequireCode] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
@@ -38,6 +42,10 @@ export default function SpinWheelPage() {
         const res = await fetch("/api/spin/status");
         const data = await res.json();
         setIsActive(Boolean(data.isActive));
+        setRequireCode(Boolean(data.requireCode));
+        if (data.requireCode) {
+          setShowCodeInput(true);
+        }
         if (Array.isArray(data.rewards) && data.rewards.length > 0) {
           setRewards(data.rewards);
         }
@@ -50,13 +58,13 @@ export default function SpinWheelPage() {
     loadStatus();
   }, []);
 
-  const handleSpin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const triggerSpin = async () => {
     if (isSpinning) return;
 
     const trimmedCode = code.trim().toUpperCase();
-    if (!trimmedCode) {
+    if (requireCode && !trimmedCode) {
       setErrorMsg("Please enter your card spin code.");
+      setShowCodeInput(true);
       return;
     }
 
@@ -68,13 +76,17 @@ export default function SpinWheelPage() {
       const res = await fetch("/api/spin/play", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: trimmedCode }),
+        body: JSON.stringify({
+          code: trimmedCode || undefined,
+          name: customerName.trim() || undefined,
+          phone: customerPhone.trim() || undefined,
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok || !data.ok) {
-        setErrorMsg(data.error || "Unable to spin with this code.");
+        setErrorMsg(data.error || "Unable to spin.");
         setIsSpinning(false);
         return;
       }
@@ -98,13 +110,18 @@ export default function SpinWheelPage() {
         setShowConfetti(true);
         setWinningResult({
           prize: data.prize || "Exciting Reward",
-          code: trimmedCode,
+          code: trimmedCode || (data.spinNumber ? `SPIN #${data.spinNumber}` : "LUCKY-WIN"),
         });
       }, 5100);
     } catch (err: any) {
       setErrorMsg(err?.message || "Network error. Please try again.");
       setIsSpinning(false);
     }
+  };
+
+  const handleSpin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await triggerSpin();
   };
 
   // Find won reward details for modal
@@ -116,9 +133,15 @@ export default function SpinWheelPage() {
       )
     : null;
 
+  const claimNameText = customerName.trim() ? ` (Name: ${customerName.trim()})` : "";
+  const claimPhoneText = customerPhone.trim() ? ` (Phone: ${customerPhone.trim()})` : "";
+  const claimCodeText = winningResult?.code.startsWith("MR-")
+    ? ` with card code ${winningResult.code}`
+    : ` (${winningResult?.code})`;
+
   const whatsappClaimUrl = winningResult
     ? `https://wa.me/917002733658?text=${encodeURIComponent(
-        `Hello Maa Radio Mart! I won the prize "${winningResult.prize}" on your Lucky Spin Wheel using card code ${winningResult.code}. Please verify and guide me to claim it!`
+        `Hello Maa Radio Mart! I won the prize "${winningResult.prize}" on your Lucky Spin Wheel${claimNameText}${claimPhoneText}${claimCodeText}. Please verify and guide me to claim it!`
       )}`
     : "#";
 
@@ -179,7 +202,9 @@ export default function SpinWheelPage() {
             Grand Lucky Spin &amp; Win
           </h1>
           <p className="text-xs md:text-sm text-slate-400 leading-relaxed max-w-lg mx-auto">
-            Scratch your secret store card, enter your code below, and spin the flagship wheel to win genuine smartphones, TVs, speakers, and premium electronics!
+            {requireCode
+              ? "Scratch your secret store card, enter your code below, and spin the flagship wheel to win genuine electronics!"
+              : "Tap the wheel or click below to spin and win genuine smartphones, TVs, speakers, and premium electronics!"}
           </p>
         </div>
 
@@ -191,6 +216,7 @@ export default function SpinWheelPage() {
               slices={rewards}
               rotation={rotation}
               isSpinning={isSpinning}
+              onSpinClick={triggerSpin}
             />
             <div className="flex items-center gap-3 mt-4 text-[11px] text-slate-400 font-medium tracking-wide">
               <span className="flex items-center gap-1.5 text-emerald-400">
@@ -198,9 +224,14 @@ export default function SpinWheelPage() {
               </span>
               <span>•</span>
               <span className="flex items-center gap-1.5 text-amber-400">
-                <Trophy size={14} /> Single-Use Code Protected
+                <Trophy size={14} /> Guaranteed Gifts on Every Turn
               </span>
             </div>
+            {!isSpinning && (
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">
+                Tip: Click anywhere on the wheel or the button to spin
+              </p>
+            )}
           </div>
 
           {/* Controls & Form */}
@@ -211,47 +242,113 @@ export default function SpinWheelPage() {
               </div>
               <div>
                 <h2 className="text-sm font-extrabold text-white uppercase tracking-wider">
-                  Unlock Your Reward
+                  {requireCode ? "Unlock Your Reward" : "Instant Lucky Spin"}
                 </h2>
-                <span className="text-[10px] text-slate-400 block">
-                  One spin per valid scratch card code
+                <span className="text-[10px] text-emerald-400 font-semibold block">
+                  {requireCode
+                    ? "Enter card code to unlock spin"
+                    : "Direct 1-Click Spin Enabled"}
                 </span>
               </div>
             </div>
 
-            <p className="text-xs text-slate-400 mb-5 leading-relaxed">
-              Enter the unique code printed on your customer scratch card (e.g. <span className="font-mono font-bold text-amber-300">MR-XXXXX</span>) to trigger the wheel.
+            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+              {requireCode
+                ? "Enter the unique code printed on your customer scratch card (e.g. MR-XXXXX) to trigger the wheel."
+                : "No code required! Simply tap below to spin the wheel and claim your assured store reward."}
             </p>
 
-            <form onSubmit={handleSpin} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1.5">
-                  Your Scratch Card Code *
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={code}
-                    onChange={(e) => {
-                      setCode(e.target.value.toUpperCase());
-                      setErrorMsg("");
-                    }}
-                    placeholder="e.g. MR-48291"
-                    disabled={isSpinning}
-                    required
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3.5 text-base font-mono font-bold text-white tracking-widest placeholder:text-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50 transition-all shadow-inner"
-                  />
-                  {code && !isSpinning && (
-                    <button
-                      type="button"
-                      onClick={() => setCode("")}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
-                    >
-                      Clear
-                    </button>
-                  )}
+            <form onSubmit={handleSpin} className="space-y-3.5">
+              {/* Optional customer info for direct spin */}
+              {!requireCode && (
+                <div className="grid grid-cols-2 gap-2 pb-1">
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase text-slate-400 tracking-wider mb-1">
+                      Your Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="e.g. Rahul"
+                      disabled={isSpinning}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase text-slate-400 tracking-wider mb-1">
+                      Mobile No. (Optional)
+                    </label>
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="e.g. 9876543210"
+                      disabled={isSpinning}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Code Input (Mandatory if requireCode is on, or optional toggle if customer has card) */}
+              {(requireCode || showCodeInput) && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                      Scratch Card Code {requireCode ? "*" : "(Optional)"}
+                    </label>
+                    {!requireCode && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCodeInput(false);
+                          setCode("");
+                        }}
+                        className="text-[9px] text-slate-400 hover:text-slate-200"
+                      >
+                        Hide
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={code}
+                      onChange={(e) => {
+                        setCode(e.target.value.toUpperCase());
+                        setErrorMsg("");
+                      }}
+                      placeholder="e.g. MR-48291"
+                      disabled={isSpinning}
+                      required={requireCode}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono font-bold text-white tracking-widest placeholder:text-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50 transition-all shadow-inner"
+                    />
+                    {code && !isSpinning && (
+                      <button
+                        type="button"
+                        onClick={() => setCode("")}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Toggle to enter code if hidden in direct mode */}
+              {!requireCode && !showCodeInput && (
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => setShowCodeInput(true)}
+                    className="text-[10px] text-amber-400/80 hover:text-amber-300 underline font-medium"
+                  >
+                    Have a promo card code? Enter here
+                  </button>
+                </div>
+              )}
 
               {/* Error Message */}
               {errorMsg && (
@@ -264,11 +361,11 @@ export default function SpinWheelPage() {
               {/* Spin Button */}
               <button
                 type="submit"
-                disabled={isSpinning || !code.trim()}
+                disabled={isSpinning || (requireCode && !code.trim())}
                 className={`w-full py-4 text-xs font-black uppercase tracking-widest text-slate-950 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer ${
                   isSpinning
                     ? "bg-amber-600 cursor-not-allowed opacity-90"
-                    : "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:brightness-110 active:scale-[0.98]"
+                    : "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:brightness-110 active:scale-[0.98] animate-pulse"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isSpinning ? (
@@ -279,7 +376,7 @@ export default function SpinWheelPage() {
                 ) : (
                   <>
                     <Sparkles size={16} className="text-slate-950" />
-                    <span>SPIN THE WHEEL</span>
+                    <span>SPIN THE WHEEL NOW!</span>
                   </>
                 )}
               </button>

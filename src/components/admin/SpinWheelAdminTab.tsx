@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from "react";
 import {
   RotateCw, Plus, Trash2, Edit2, CheckCircle, AlertCircle,
-  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw, Printer, Search, RotateCcw, ImageIcon, Image as ImageIcon2
+  ToggleLeft, ToggleRight, Sparkles, Gift, Key, Layers, Loader2, RefreshCw, Printer, Search, RotateCcw, ImageIcon,
+  Target, Check, Zap, Play, History, ArrowRight, ChevronRight, Sliders, ListOrdered
 } from "lucide-react";
-import { SpinReward, SpinCode, SpinSettings, SpinStats } from "@/lib/spinTypes";
+import { SpinReward, SpinCode, SpinSettings, SpinStats, SpinControlConfig } from "@/lib/spinTypes";
 import ImageUploader from "@/components/ImageUploader";
 
 export default function SpinWheelAdminTab({ token }: { token: string }) {
@@ -19,6 +20,8 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
   const [stats, setStats] = useState<SpinStats>({ total_spins: 0 });
   const [rewards, setRewards] = useState<SpinReward[]>([]);
   const [codes, setCodes] = useState<SpinCode[]>([]);
+  const [spinControl, setSpinControl] = useState<SpinControlConfig | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<"director" | "slices" | "codes">("director");
 
   // Reward Edit Form state
   const [editingRewardId, setEditingRewardId] = useState<string | null>(null);
@@ -48,6 +51,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
       setStats(data.stats || { total_spins: 0 });
       setRewards(data.rewards || []);
       setCodes(data.codes || []);
+      setSpinControl(data.spinControl || null);
     } catch (err: any) {
       setErrorMsg(err?.message || "Failed to load data.");
     } finally {
@@ -83,6 +87,138 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
 
       setSettings({ ...settings, is_active: nextState });
       showNotification(`Spin Wheel is now ${nextState ? "ACTIVE (ON)" : "PAUSED (OFF)"}`);
+    } catch (err: any) {
+      setErrorMsg(err?.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 1B. Set Next Prize Target (Instant 1-Click Winner for Next Spin)
+  const handleSetNextPrize = async (prizeName: string | null) => {
+    setSaving(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/admin/spin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: "set_next_prize", nextPrize: prizeName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to set next prize.");
+
+      setSpinControl(data.spinControl);
+      showNotification(
+        prizeName
+          ? `Target set! Next customer will win "${prizeName}".`
+          : "Override removed. Next spin will follow sequence order."
+      );
+    } catch (err: any) {
+      setErrorMsg(err?.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 1C. Toggle Require Code (Direct Spin vs Card Code Mode)
+  const handleToggleRequireCode = async (requireCode: boolean) => {
+    setSaving(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/admin/spin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: "update_spin_control",
+          spinControl: { require_code: requireCode },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update code mode.");
+
+      setSpinControl(data.spinControl);
+      showNotification(
+        requireCode
+          ? "Code Mode: Customers must now enter a scratch card code to spin."
+          : "Direct Spin Mode: Customers can now tap to spin directly without typing codes!"
+      );
+    } catch (err: any) {
+      setErrorMsg(err?.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 1D. Update Specific Sequence Step
+  const handleUpdateSequenceItem = async (index: number, prize: string) => {
+    try {
+      const res = await fetch("/api/admin/spin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: "update_sequence_item", index, prize }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update sequence step.");
+
+      setSpinControl(data.spinControl);
+      showNotification(`Spin #${index + 1} updated to "${prize}".`);
+    } catch (err: any) {
+      setErrorMsg(err?.message);
+    }
+  };
+
+  // 1E. Reset Sequence to Standard 101 Sequence
+  const handleResetSequence = async () => {
+    if (!confirm("Reset the spin sequence queue to the standard 101 prizes sequence?")) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/spin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: "reset_sequence" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reset sequence.");
+
+      setSpinControl(data.spinControl);
+      showNotification("Sequence reset to standard 101 prizes.");
+    } catch (err: any) {
+      setErrorMsg(err?.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 1F. Reset Queue Counter
+  const handleResetSpinCounter = async (targetIndex = 0) => {
+    if (!confirm(`Reset the spin queue counter to Spin #${targetIndex + 1}?`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/spin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: "reset_spin_counter", index: targetIndex }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reset spin counter.");
+
+      setSpinControl(data.spinControl);
+      showNotification(`Queue position set to Spin #${targetIndex + 1}.`);
     } catch (err: any) {
       setErrorMsg(err?.message);
     } finally {
@@ -268,6 +404,12 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
   }
 
   const usedCodesCount = codes.filter((c) => c.used).length;
+  const currentSpinIndex = spinControl?.current_spin_index || 0;
+  const currentSequence = spinControl?.sequence || [];
+  const nextScheduledPrize =
+    currentSequence.length > 0
+      ? currentSequence[currentSpinIndex % currentSequence.length]
+      : "Cup";
 
   return (
     <div className="p-6 md:p-10 space-y-8 bg-white min-h-[600px]">
@@ -360,8 +502,356 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
         </div>
       </div>
 
-      {/* SECTION 1: REWARDS CONFIGURATION */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-4">
+      {/* Sub-Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-[#E2E2DF] pb-3 pt-1 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("director")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            activeSubTab === "director"
+              ? "bg-[#7A2E2E] text-white shadow-sm"
+              : "bg-white text-[#666666] border border-[#E2E2DF] hover:bg-[#F8F8F6]"
+          }`}
+        >
+          <Target size={15} />
+          <span>Live Spin Director</span>
+          {spinControl?.next_prize ? (
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+          ) : (
+            <span className="text-[9px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-black">
+              DIRECT
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("slices")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            activeSubTab === "slices"
+              ? "bg-[#7A2E2E] text-white shadow-sm"
+              : "bg-white text-[#666666] border border-[#E2E2DF] hover:bg-[#F8F8F6]"
+          }`}
+        >
+          <Gift size={15} />
+          <span>Wheel Slices &amp; Photos ({rewards.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("codes")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            activeSubTab === "codes"
+              ? "bg-[#7A2E2E] text-white shadow-sm"
+              : "bg-white text-[#666666] border border-[#E2E2DF] hover:bg-[#F8F8F6]"
+          }`}
+        >
+          <Key size={15} />
+          <span>Master Card List ({codes.length})</span>
+        </button>
+      </div>
+
+      {/* SUB-TAB 1: LIVE SPIN DIRECTOR & TARGET WINNER */}
+      {activeSubTab === "director" && (
+        <div className="space-y-8 pt-2">
+          {/* 1. Mode Status & Toggle */}
+          <div className="border border-[#E2E2DF] rounded-2xl p-5 bg-white shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                spinControl?.require_code ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+              }`}>
+                {spinControl?.require_code ? <Key size={22} /> : <Zap size={22} />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                    spinControl?.require_code ? "bg-amber-100 text-amber-900 border border-amber-300" : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                  }`}>
+                    {spinControl?.require_code ? "Scratch Card Code Protected" : "Direct 1-Click Spin Active"}
+                  </span>
+                  <span className="text-[11px] text-[#888888]">• Current Queue: Spin #{currentSpinIndex + 1}</span>
+                </div>
+                <p className="text-xs text-[#555555] mt-1 font-medium">
+                  {spinControl?.require_code
+                    ? "Customers must enter their card secret code (MR-XXXXX) to trigger the wheel."
+                    : "Customers directly click the wheel on the website to spin — no code typing required!"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => handleToggleRequireCode(!spinControl?.require_code)}
+              className="px-4 py-2.5 rounded-xl border border-[#D5D5D0] hover:bg-[#F8F8F6] text-xs font-bold uppercase tracking-wider text-[#222222] transition-colors whitespace-nowrap self-start md:self-auto cursor-pointer"
+            >
+              {spinControl?.require_code ? "Switch To Direct Spin" : "Switch To Code Mode"}
+            </button>
+          </div>
+
+          {/* 2. Instant Winner Targeter (Direct Outcome for Next Spin) */}
+          <div className="border-2 border-amber-400/60 rounded-3xl p-6 bg-gradient-to-br from-amber-500/5 via-white to-amber-500/10 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-amber-200/80 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Target size={18} className="text-[#7A2E2E]" />
+                  <h3 className="text-sm font-black uppercase tracking-wider text-[#222222]">
+                    1-Click Target Next Spin Winner
+                  </h3>
+                </div>
+                <p className="text-xs text-[#666666] mt-0.5">
+                  Select any product below to guarantee the very next customer spin lands on it!
+                </p>
+              </div>
+
+              {spinControl?.next_prize && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleSetNextPrize(null)}
+                  className="px-3.5 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 text-[11px] font-bold uppercase transition-colors self-start md:self-auto"
+                >
+                  Clear Override &amp; Use Sequence
+                </button>
+              )}
+            </div>
+
+            {/* Current Target Status Callout */}
+            <div className={`p-4 rounded-2xl flex items-center justify-between gap-4 ${
+              spinControl?.next_prize
+                ? "bg-amber-500/15 border-2 border-amber-400 text-amber-950"
+                : "bg-emerald-500/10 border border-emerald-300 text-emerald-950"
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">
+                  {spinControl?.next_prize ? "🎯" : "🔄"}
+                </span>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider block opacity-75">
+                    {spinControl?.next_prize ? "Forced Winner Locked In" : "Following Scheduled Sequence"}
+                  </span>
+                  <div className="text-base font-extrabold flex items-center gap-2">
+                    <span>Next Spin Result:</span>
+                    <span className="underline decoration-2 text-[#7A2E2E]">
+                      {spinControl?.next_prize || nextScheduledPrize}
+                    </span>
+                    {!spinControl?.next_prize && (
+                      <span className="text-xs font-normal text-slate-500">
+                        (Queue Step #{currentSpinIndex + 1})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-white/80 rounded-full shadow-xs">
+                {spinControl?.next_prize ? "Override Active" : "Ready For Spin"}
+              </span>
+            </div>
+
+            {/* Quick 1-Click Buttons Grid */}
+            <div className="pt-2">
+              <span className="text-[10px] font-bold uppercase text-[#666666] tracking-wider block mb-2">
+                Click any product below to set as the next winner:
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                {rewards.filter((r) => r.enabled).map((r) => {
+                  const isSelected = spinControl?.next_prize === r.reward_name;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => handleSetNextPrize(isSelected ? null : r.reward_name)}
+                      className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-2 cursor-pointer ${
+                        isSelected
+                          ? "bg-[#7A2E2E] text-white border-[#7A2E2E] shadow-md scale-105 ring-2 ring-amber-400"
+                          : "bg-white border-[#E2E2DF] hover:border-[#7A2E2E] hover:shadow-sm"
+                      }`}
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center overflow-hidden">
+                        {r.image_url ? (
+                          <img
+                            src={r.image_url}
+                            alt={r.reward_name}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <Gift size={20} className={isSelected ? "text-white" : "text-[#7A2E2E]"} />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold truncate max-w-full block leading-tight">
+                        {r.reward_name}
+                      </span>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        isSelected ? "bg-amber-400 text-slate-950" : "bg-slate-100 text-slate-700"
+                      }`}>
+                        {isSelected ? "Selected ✓" : "Set Winner"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Spin Sequence Queue (1st, 2nd, 3rd, 4th...) */}
+          <div className="border border-[#E2E2DF] rounded-2xl p-6 bg-white shadow-xs space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#E2E2DF] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ListOrdered size={18} className="text-[#8A6A44]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222]">
+                    Planned Spin Queue (Auto-Order Delivery)
+                  </h3>
+                </div>
+                <p className="text-[11px] text-[#666666] mt-0.5">
+                  1st customer gets #1, 2nd customer gets #2, 3rd gets #3. You can change any step using the dropdowns.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleResetSpinCounter(0)}
+                  className="px-3 py-1.5 border border-[#D5D5D0] hover:bg-[#F8F8F6] text-[11px] font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                  title="Start over from Spin #1"
+                >
+                  Reset to Spin #1
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={handleResetSequence}
+                  className="px-3 py-1.5 border border-[#8A6A44] text-[#8A6A44] hover:bg-[#8A6A44] hover:text-white text-[11px] font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                  title="Restore preassigned 101 sequence"
+                >
+                  Restore 101 Order
+                </button>
+              </div>
+            </div>
+
+            {/* Upcoming Sequence Cards List */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 max-h-[460px] overflow-y-auto p-1">
+              {currentSequence.slice(0, 30).map((prize, idx) => {
+                const isCurrent = idx === currentSpinIndex;
+                const isPast = idx < currentSpinIndex;
+                return (
+                  <div
+                    key={`seq-${idx}`}
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      isCurrent
+                        ? "bg-amber-500/10 border-amber-400 shadow-sm ring-1 ring-amber-400"
+                        : isPast
+                        ? "bg-slate-50 border-slate-200 opacity-60"
+                        : "bg-white border-[#E2E2DF] hover:border-slate-400"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-black uppercase text-[#888888]">
+                        Spin #{idx + 1}
+                      </span>
+                      {isCurrent && (
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 animate-pulse">
+                          Next Up ⚡
+                        </span>
+                      )}
+                      {isPast && (
+                        <span className="text-[9px] font-semibold text-slate-400">
+                          Spun ✓
+                        </span>
+                      )}
+                    </div>
+
+                    <select
+                      value={prize}
+                      onChange={(e) => handleUpdateSequenceItem(idx, e.target.value)}
+                      className="w-full text-xs font-bold bg-white border border-[#D5D5D0] rounded-lg p-2 text-[#222222] focus:outline-none focus:border-[#7A2E2E]"
+                    >
+                      {rewards.filter((r) => r.enabled).map((r) => (
+                        <option key={r.id} value={r.reward_name}>
+                          {r.reward_name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="flex justify-end mt-2">
+                      {!isCurrent && (
+                        <button
+                          type="button"
+                          onClick={() => handleResetSpinCounter(idx)}
+                          className="text-[9px] text-[#7A2E2E] hover:underline font-bold uppercase cursor-pointer"
+                        >
+                          Make Next
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. Live Completed Direct Spins Log */}
+          {spinControl?.history && spinControl.history.length > 0 && (
+            <div className="border border-[#E2E2DF] rounded-2xl p-6 bg-white shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-[#E2E2DF] pb-3">
+                <div className="flex items-center gap-2">
+                  <History size={16} className="text-[#7A2E2E]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#222222]">
+                    Recent Spins Live Log ({spinControl.history.length})
+                  </h3>
+                </div>
+                <span className="text-[10px] text-[#888888] uppercase tracking-wider">
+                  Real-time Customer Spins
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F8F8F6] border-b border-[#E2E2DF] text-[#666666] uppercase font-bold text-[10px]">
+                    <tr>
+                      <th className="p-3">Spin #</th>
+                      <th className="p-3">Prize Won</th>
+                      <th className="p-3">Winner Details</th>
+                      <th className="p-3">Date &amp; Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2E2DF]">
+                    {spinControl.history.slice(0, 10).map((h) => (
+                      <tr key={h.id} className="hover:bg-[#F8F8F6]/60 transition-colors">
+                        <td className="p-3 font-mono font-bold text-[#7A2E2E]">
+                          #{h.spin_number}
+                        </td>
+                        <td className="p-3 font-bold text-[#222222]">
+                          {h.prize}
+                        </td>
+                        <td className="p-3 text-[#666666]">
+                          {h.winner_name || h.winner_phone ? (
+                            <span>
+                              {h.winner_name} {h.winner_phone ? `(${h.winner_phone})` : ""}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Direct counter spin</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-[11px] text-slate-500">
+                          {new Date(h.created_at).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB-TAB 2: WHEEL SLICES & PHOTOS */}
+      {activeSubTab === "slices" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-4">
         {/* Add/Edit Reward Form */}
         <div className="lg:col-span-5 border border-[#E2E2DF] p-6 rounded-2xl bg-[#F8F8F6]">
           <div className="flex items-center gap-2 mb-4">
@@ -625,9 +1115,11 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* SECTION 2: ACCESS CODES GENERATOR & LIST */}
-      <div className="pt-8 border-t border-[#E2E2DF]">
+      {/* SUB-TAB 3: MASTER CARD LIST & ACCESS CODES */}
+      {activeSubTab === "codes" && (
+        <div className="pt-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-2">
@@ -774,6 +1266,7 @@ export default function SpinWheelAdminTab({ token }: { token: string }) {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

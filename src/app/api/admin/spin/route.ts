@@ -41,9 +41,12 @@ export async function GET(request: NextRequest) {
       supabase.from("site_content").select("data").limit(1).maybeSingle(),
     ]);
 
-    const { resolveRewardImage } = await import("@/lib/spinServer");
+    const { resolveRewardImage, getDefaultSpinControl } = await import("@/lib/spinServer");
+    const contentData = contentRes.data?.data || {};
     const storedRewardImages: Record<string, string> =
-      (contentRes.data?.data && typeof contentRes.data.data === "object" && (contentRes.data.data as any).spinRewardImages) || {};
+      (typeof contentData === "object" && (contentData as any).spinRewardImages) || {};
+    const spinControl =
+      (typeof contentData === "object" && (contentData as any).spinControl) || getDefaultSpinControl();
 
     const rewards = (rewardsRes.data || []).map((r: any) => ({
       ...r,
@@ -74,6 +77,7 @@ export async function GET(request: NextRequest) {
       rewards,
       stats: statsRes.data || { id: "global", total_spins: 0 },
       codes,
+      spinControl,
     });
   } catch (error: any) {
     console.error("[GET /api/admin/spin error]", error);
@@ -297,6 +301,137 @@ export async function POST(request: NextRequest) {
       if (code) markCodeUsedInMemory(code, targetUsed);
 
       return NextResponse.json({ ok: true, used: targetUsed });
+    }
+
+    // 7. Set Target Next Prize (1-click owner selection)
+    if (action === "set_next_prize") {
+      const nextPrize = body.nextPrize ? String(body.nextPrize).trim() : null;
+      const { getDefaultSpinControl } = await import("@/lib/spinServer");
+      const { data: contentRow } = await supabase.from("site_content").select("id, data").limit(1).maybeSingle();
+      if (!contentRow || !contentRow.id) {
+        return NextResponse.json({ error: "site_content table row not found." }, { status: 500 });
+      }
+
+      const currentData = contentRow.data || {};
+      const spinControl = {
+        ...getDefaultSpinControl(),
+        ...(currentData.spinControl || {}),
+        next_prize: nextPrize,
+      };
+
+      const { error: updateErr } = await supabase.from("site_content").update({
+        data: { ...currentData, spinControl },
+        updated_at: new Date().toISOString(),
+      }).eq("id", contentRow.id);
+
+      if (updateErr) throw new Error(updateErr.message);
+      return NextResponse.json({ ok: true, spinControl });
+    }
+
+    // 8. Update Full Spin Control (e.g. toggle direct spin vs code required, mode, etc.)
+    if (action === "update_spin_control") {
+      const { getDefaultSpinControl } = await import("@/lib/spinServer");
+      const { data: contentRow } = await supabase.from("site_content").select("id, data").limit(1).maybeSingle();
+      if (!contentRow || !contentRow.id) {
+        return NextResponse.json({ error: "site_content table row not found." }, { status: 500 });
+      }
+
+      const currentData = contentRow.data || {};
+      const spinControl = {
+        ...getDefaultSpinControl(),
+        ...(currentData.spinControl || {}),
+        ...(body.spinControl || {}),
+      };
+
+      const { error: updateErr } = await supabase.from("site_content").update({
+        data: { ...currentData, spinControl },
+        updated_at: new Date().toISOString(),
+      }).eq("id", contentRow.id);
+
+      if (updateErr) throw new Error(updateErr.message);
+      return NextResponse.json({ ok: true, spinControl });
+    }
+
+    // 9. Update Specific Sequence Step
+    if (action === "update_sequence_item") {
+      const { index, prize } = body;
+      const { getDefaultSpinControl } = await import("@/lib/spinServer");
+      const { data: contentRow } = await supabase.from("site_content").select("id, data").limit(1).maybeSingle();
+      if (!contentRow || !contentRow.id) {
+        return NextResponse.json({ error: "site_content table row not found." }, { status: 500 });
+      }
+
+      const currentData = contentRow.data || {};
+      const spinControl = {
+        ...getDefaultSpinControl(),
+        ...(currentData.spinControl || {}),
+      };
+
+      const sequence = [...(spinControl.sequence || [])];
+      if (typeof index === "number" && index >= 0 && index < sequence.length && prize) {
+        sequence[index] = String(prize).trim();
+        spinControl.sequence = sequence;
+
+        const { error: updateErr } = await supabase.from("site_content").update({
+          data: { ...currentData, spinControl },
+          updated_at: new Date().toISOString(),
+        }).eq("id", contentRow.id);
+
+        if (updateErr) throw new Error(updateErr.message);
+        return NextResponse.json({ ok: true, spinControl });
+      }
+
+      return NextResponse.json({ error: "Invalid sequence index or prize." }, { status: 400 });
+    }
+
+    // 10. Reset Sequence to Default (101 Cards Sequence)
+    if (action === "reset_sequence") {
+      const { getDefaultSpinControl } = await import("@/lib/spinServer");
+      const { PREASSIGNED_SPIN_CODES } = await import("@/data/spinCodesData");
+      const { data: contentRow } = await supabase.from("site_content").select("id, data").limit(1).maybeSingle();
+      if (!contentRow || !contentRow.id) {
+        return NextResponse.json({ error: "site_content table row not found." }, { status: 500 });
+      }
+
+      const currentData = contentRow.data || {};
+      const spinControl = {
+        ...getDefaultSpinControl(),
+        ...(currentData.spinControl || {}),
+        sequence: PREASSIGNED_SPIN_CODES.map((c) => c.prize),
+      };
+
+      const { error: updateErr } = await supabase.from("site_content").update({
+        data: { ...currentData, spinControl },
+        updated_at: new Date().toISOString(),
+      }).eq("id", contentRow.id);
+
+      if (updateErr) throw new Error(updateErr.message);
+      return NextResponse.json({ ok: true, spinControl });
+    }
+
+    // 11. Reset Spin Counter / Index
+    if (action === "reset_spin_counter") {
+      const targetIndex = typeof body.index === "number" ? body.index : 0;
+      const { getDefaultSpinControl } = await import("@/lib/spinServer");
+      const { data: contentRow } = await supabase.from("site_content").select("id, data").limit(1).maybeSingle();
+      if (!contentRow || !contentRow.id) {
+        return NextResponse.json({ error: "site_content table row not found." }, { status: 500 });
+      }
+
+      const currentData = contentRow.data || {};
+      const spinControl = {
+        ...getDefaultSpinControl(),
+        ...(currentData.spinControl || {}),
+        current_spin_index: targetIndex,
+      };
+
+      const { error: updateErr } = await supabase.from("site_content").update({
+        data: { ...currentData, spinControl },
+        updated_at: new Date().toISOString(),
+      }).eq("id", contentRow.id);
+
+      if (updateErr) throw new Error(updateErr.message);
+      return NextResponse.json({ ok: true, spinControl });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

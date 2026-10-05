@@ -1,5 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
-import { SpinReward, SpinPlayResponse } from "./spinTypes";
+import {
+  SpinReward,
+  SpinPlayResponse,
+  SpinControlConfig,
+  SpinControlHistoryItem,
+  SpinStatusResponse,
+} from "./spinTypes";
 import { PREASSIGNED_SPIN_CODES } from "@/data/spinCodesData";
 
 export function getSupabaseBackend() {
@@ -40,10 +46,22 @@ export function resolveRewardImage(rewardName: string, customImage?: string | nu
   return "";
 }
 
+export function getDefaultSpinControl(): SpinControlConfig {
+  return {
+    mode: "sequence",
+    require_code: false, // Default: Direct 1-Click Spin! No code typing required
+    next_prize: null, // One-click override if owner wants a specific prize next
+    current_spin_index: 0,
+    sequence: PREASSIGNED_SPIN_CODES.map((c) => c.prize),
+    history: [],
+  };
+}
+
 // In-memory fallback if database migration hasn't been executed yet
 const memoryState = {
   isActive: true,
   totalSpins: 0,
+  control: getDefaultSpinControl(),
   rewards: [
     { id: "1", reward_name: "TV", image_url: DEFAULT_REWARD_IMAGES["TV"], milestone: 101, type: "milestone", enabled: true },
     { id: "2", reward_name: "Special Gift", image_url: DEFAULT_REWARD_IMAGES["Special Gift"], milestone: 30, type: "milestone", enabled: true },
@@ -76,8 +94,11 @@ export async function getSpinPublicStatus() {
       supabase.from("site_content").select("data").limit(1).maybeSingle(),
     ]);
 
+    const contentData = contentRes.data?.data || {};
     const storedRewardImages: Record<string, string> =
-      (contentRes.data?.data && typeof contentRes.data.data === "object" && (contentRes.data.data as any).spinRewardImages) || {};
+      (typeof contentData === "object" && (contentData as any).spinRewardImages) || {};
+    const spinControl: SpinControlConfig =
+      (typeof contentData === "object" && (contentData as any).spinControl) || getDefaultSpinControl();
 
     if (!settingsRes.error && !rewardsRes.error && rewardsRes.data && rewardsRes.data.length > 0) {
       const enrichedRewards = rewardsRes.data.map((r: any) => ({
@@ -95,6 +116,7 @@ export async function getSpinPublicStatus() {
         isActive: settingsRes.data?.is_active ?? true,
         rewards: enrichedRewards,
         totalSpins: statsRes.data?.total_spins || 0,
+        requireCode: Boolean(spinControl.require_code),
         source: "supabase",
       };
     }
@@ -113,9 +135,178 @@ export async function getSpinPublicStatus() {
       image_url: resolveRewardImage(r.reward_name, r.image_url),
     })),
     totalSpins: memoryState.totalSpins,
+    requireCode: Boolean(memoryState.control.require_code),
     source: "local_fallback",
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Direct Spin Play (No Code Needed - Admin Controlled Next Prize & Sequence)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function processDirectSpinPlay(opts?: {
+  name?: string;
+  phone?: string;
+}): Promise<SpinPlayResponse> {
+  try {
+    const supabase = getSupabaseBackend();
+
+    // 1. Check if spin is active
+    const { data: setting, error: settingErr } = await supabase
+      .from("spin_settings")
+      .select("is_active")
+      .eq("id", "global")
+      .maybeSingle();
+
+    if (!settingErr && setting && !setting.is_active) {
+      return { ok: false, error: "Spin the Wheel is currently inactive." };
+    }
+
+    // 2. Fetch site_content and enabled rewards
+    const [contentRes, rewardsRes, statsRes] = await Promise.all([
+      supabase.from("site_content").select("id, data").limit(1).maybeSingle(),
+      supabase.from("spin_rewards").select("*").eq("enabled", true).order("created_at", { ascending: true }),
+      supabase.from("spin_stats").select("total_spins").eq("id", "global").maybeSingle(),
+    ]);
+
+    const activeRewards =
+      rewardsRes.data && rewardsRes.data.length > 0
+        ? rewardsRes.data
+        : memoryState.rewards.filter((r) => r.enabled);
+
+    const contentRow = contentRes.data;
+    const contentData = contentRow?.data || {};
+    const control: SpinControlConfig = {
+      ...getDefaultSpinControl(),
+      ...(contentData.spinControl || {}),
+    };
+
+    // 3. Determine winning prize
+    let winningPrize = "";
+
+    // Priority A: Did admin force a specific Next Prize? (e.g. "Cup", "TV", etc.)
+    if (control.next_prize && control.next_prize.trim()) {
+      winningPrize = control.next_prize.trim();
+      // Consume the manual override once used!
+      control.next_prize = null;
+      control.current_spin_index = (control.current_spin_index || 0) + 1;
+    } else if (control.mode === "sequence") {
+      // Priority B: Follow planned sequence (1st spin, 2nd spin, 3rd spin...)
+      const seq =
+        Array.isArray(control.sequence) && control.sequence.length > 0
+          ? control.sequence
+          : PREASSIGNED_SPIN_CODES.map((c) => c.prize);
+
+      const currentIndex = control.current_spin_index || 0;
+      winningPrize = seq[currentIndex % seq.length];
+      control.current_spin_index = currentIndex + 1;
+    } else {
+      // Priority C: Random slice among enabled rewards
+      const randomIdx = Math.floor(Math.random() * activeRewards.length);
+      winningPrize = activeRewards[randomIdx]?.reward_name || "Cup";
+      control.current_spin_index = (control.current_spin_index || 0) + 1;
+    }
+
+    // 4. Find exact slice index for visual wheel animation
+    const normalizedPrize = winningPrize.trim().toLowerCase();
+    let sliceIndex = activeRewards.findIndex(
+      (r: any) => r.reward_name.trim().toLowerCase() === normalizedPrize
+    );
+    if (sliceIndex === -1) {
+      sliceIndex = activeRewards.findIndex(
+        (r: any) =>
+          r.reward_name.toLowerCase().includes(normalizedPrize) ||
+          normalizedPrize.includes(r.reward_name.toLowerCase())
+      );
+    }
+    if (sliceIndex === -1) sliceIndex = 0;
+
+    // 5. Increment spin count in spin_stats
+    let nextTotal = 1;
+    if (statsRes.data && typeof statsRes.data.total_spins === "number") {
+      nextTotal = statsRes.data.total_spins + 1;
+    }
+    await supabase.from("spin_stats").upsert({
+      id: "global",
+      total_spins: nextTotal,
+      updated_at: new Date().toISOString(),
+    });
+
+    // 6. Record history entry
+    const historyItem: SpinControlHistoryItem = {
+      id: String(Date.now()),
+      spin_number: nextTotal,
+      prize: winningPrize,
+      winner_name: opts?.name?.trim() || null,
+      winner_phone: opts?.phone?.trim() || null,
+      created_at: new Date().toISOString(),
+    };
+
+    control.history = [historyItem, ...(control.history || [])].slice(0, 100);
+
+    // 7. Persist back to site_content.data.spinControl
+    if (contentRow && contentRow.id) {
+      await supabase
+        .from("site_content")
+        .update({
+          data: {
+            ...contentData,
+            spinControl: control,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", contentRow.id);
+    }
+
+    // Synchronize memory fallback
+    memoryState.totalSpins = nextTotal;
+    memoryState.control = control;
+
+    return {
+      ok: true,
+      prize: winningPrize,
+      sliceIndex,
+      totalSpins: nextTotal,
+      spinNumber: nextTotal,
+    };
+  } catch (err: any) {
+    console.warn("[processDirectSpinPlay] DB exception, using fallback:", err);
+  }
+
+  // Fallback if DB unavailable
+  if (!memoryState.isActive) {
+    return { ok: false, error: "Spin the Wheel is currently inactive." };
+  }
+
+  const control = memoryState.control;
+  let winningPrize = "";
+
+  if (control.next_prize && control.next_prize.trim()) {
+    winningPrize = control.next_prize.trim();
+    control.next_prize = null;
+    control.current_spin_index = (control.current_spin_index || 0) + 1;
+  } else {
+    const seq = control.sequence.length > 0 ? control.sequence : PREASSIGNED_SPIN_CODES.map((c) => c.prize);
+    winningPrize = seq[(control.current_spin_index || 0) % seq.length];
+    control.current_spin_index = (control.current_spin_index || 0) + 1;
+  }
+
+  memoryState.totalSpins += 1;
+  const activeRewards = memoryState.rewards.filter((r) => r.enabled);
+  const normalizedPrize = winningPrize.trim().toLowerCase();
+  let sliceIndex = activeRewards.findIndex(
+    (r) => r.reward_name.trim().toLowerCase() === normalizedPrize
+  );
+  if (sliceIndex === -1) sliceIndex = 0;
+
+  return {
+    ok: true,
+    prize: winningPrize,
+    sliceIndex,
+    totalSpins: memoryState.totalSpins,
+    spinNumber: memoryState.totalSpins,
+  };
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Process Spin Play (Backend Control with 101 Pre-Assigned Codes)

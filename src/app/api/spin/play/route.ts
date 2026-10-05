@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processSpinPlay } from "@/lib/spinServer";
+import { processSpinPlay, processDirectSpinPlay } from "@/lib/spinServer";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const code = body?.code;
+    const body = await request.json().catch(() => ({}));
+    const code = typeof body?.code === "string" ? body.code.trim() : "";
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
 
-    if (!code || typeof code !== "string") {
-      return NextResponse.json(
-        { ok: false, error: "Spin code is required." },
-        { status: 400 }
-      );
+    let result;
+    if (code) {
+      // Customer used scratch card code
+      result = await processSpinPlay(code);
+    } else {
+      // Direct Spin: 1-Click Spin governed by Admin's Target Next Prize & Sequence
+      result = await processDirectSpinPlay({ name, phone });
     }
-
-    const result = await processSpinPlay(code);
 
     if (!result.ok) {
       return NextResponse.json(
