@@ -2,7 +2,6 @@
 
 import React, { useRef, useState } from "react";
 import { Upload, X, ImageIcon, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
 interface ImageUploaderProps {
   value: string; // current image URL or Base64
@@ -37,23 +36,22 @@ export default function ImageUploader({
 
     setIsUploading(true);
     try {
-      const supabase = createClient();
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-      const filePath = `uploads/${fileName}`;
+      const formData = new FormData();
+      formData.append("file", file);
 
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(filePath, file, { cacheControl: '31536000', upsert: false });
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-      if (uploadError) {
-        throw uploadError;
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to upload image.");
       }
 
-      const { data } = supabase.storage.from('media').getPublicUrl(filePath);
-      onChange(data.publicUrl);
+      onChange(data.url);
     } catch (err: any) {
-      setError(err.message || "Failed to upload image. Make sure Supabase storage is configured.");
+      setError(err.message || "Failed to upload image. Please try again.");
     } finally {
       setIsUploading(false);
     }

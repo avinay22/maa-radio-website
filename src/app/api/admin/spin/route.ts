@@ -174,8 +174,8 @@ export async function POST(request: NextRequest) {
       // 2. Also persist photo in site_content.data.spinRewardImages for 100% reliable image loading
       if (imageUrl !== undefined) {
         try {
-          const { data: contentRow } = await supabase.from("site_content").select("data").limit(1).maybeSingle();
-          if (contentRow) {
+          const { data: contentRow } = await supabase.from("site_content").select("id, data").limit(1).maybeSingle();
+          if (contentRow && contentRow.id) {
             const currentData = contentRow.data || {};
             const spinRewardImages = { ...(currentData.spinRewardImages || {}) };
             spinRewardImages[rewardId] = imageUrl;
@@ -183,10 +183,14 @@ export async function POST(request: NextRequest) {
             if (oldRewardName && oldRewardName !== newRewardName) {
               delete spinRewardImages[oldRewardName];
             }
-            await supabase.from("site_content").update({
+            const { error: updateErr } = await supabase.from("site_content").update({
               data: { ...currentData, spinRewardImages },
               updated_at: new Date().toISOString(),
-            }).limit(1);
+            }).eq("id", contentRow.id);
+
+            if (updateErr) {
+              console.error("[save_reward] site_content update error:", updateErr);
+            }
           }
         } catch (imgErr) {
           console.warn("[save_reward] site_content spinRewardImages sync warning:", imgErr);
