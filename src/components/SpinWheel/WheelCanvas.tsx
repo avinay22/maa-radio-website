@@ -14,6 +14,7 @@ interface WheelCanvasProps {
   slices: WheelSlice[];
   rotation: number;
   isSpinning: boolean;
+  durationSeconds?: number;
   onSpinClick?: () => void;
 }
 
@@ -33,6 +34,7 @@ export default function WheelCanvas({
   slices,
   rotation,
   isSpinning,
+  durationSeconds = 11,
   onSpinClick,
 }: WheelCanvasProps) {
   const count = slices.length || 1;
@@ -113,7 +115,7 @@ export default function WheelCanvas({
         style={{
           transform: `rotate(${rotation}deg)`,
           transition: isSpinning
-            ? "transform 5s cubic-bezier(0.12, 0.95, 0.15, 1.0)"
+            ? `transform ${durationSeconds}s cubic-bezier(0.12, 0.98, 0.15, 1.0)`
             : "none",
         }}
       >

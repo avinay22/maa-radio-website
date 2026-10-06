@@ -97,14 +97,14 @@ export default function SpinWheelPage() {
       const targetSlice = typeof data.sliceIndex === "number" ? data.sliceIndex : 0;
       const sliceCenter = targetSlice * sliceAngle + sliceAngle / 2;
 
-      // 6 full spins (2160deg) + offset to align pointer at 12 o'clock
+      // 14 full revolutions (5040deg) + offset to align pointer at 12 o'clock for a thrilling suspenseful 11s spin
       const currentFullSpins = Math.floor(rotation / 360);
-      const nextSpins = (currentFullSpins + 6) * 360;
+      const nextSpins = (currentFullSpins + 14) * 360;
       const finalAngle = nextSpins + (360 - sliceCenter);
 
       setRotation(finalAngle);
 
-      // Wait for 5s animation to complete
+      // Wait for 11s animation to settle completely
       setTimeout(() => {
         setIsSpinning(false);
         setShowConfetti(true);
@@ -112,7 +112,7 @@ export default function SpinWheelPage() {
           prize: data.prize || "Exciting Reward",
           code: trimmedCode || (data.spinNumber ? `SPIN #${data.spinNumber}` : "LUCKY-WIN"),
         });
-      }, 5100);
+      }, 11150);
     } catch (err: any) {
       setErrorMsg(err?.message || "Network error. Please try again.");
       setIsSpinning(false);
@@ -216,6 +216,7 @@ export default function SpinWheelPage() {
               slices={rewards}
               rotation={rotation}
               isSpinning={isSpinning}
+              durationSeconds={11}
               onSpinClick={triggerSpin}
             />
             <div className="flex items-center gap-3 mt-4 text-[11px] text-slate-400 font-medium tracking-wide">
