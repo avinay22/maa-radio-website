@@ -34,7 +34,7 @@ export default function WheelCanvas({
   slices,
   rotation,
   isSpinning,
-  durationSeconds = 11,
+  durationSeconds = 20,
   onSpinClick,
 }: WheelCanvasProps) {
   const count = slices.length || 1;
@@ -115,7 +115,7 @@ export default function WheelCanvas({
         style={{
           transform: `rotate(${rotation}deg)`,
           transition: isSpinning
-            ? `transform ${durationSeconds}s cubic-bezier(0.12, 0.98, 0.15, 1.0)`
+            ? `transform ${durationSeconds}s cubic-bezier(0.15, 0.85, 0.2, 1.0)`
             : "none",
         }}
       >

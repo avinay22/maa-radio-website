@@ -150,23 +150,17 @@ export async function processDirectSpinPlay(opts?: {
   try {
     const supabase = getSupabaseBackend();
 
-    // 1. Check if spin is active
-    const { data: setting, error: settingErr } = await supabase
-      .from("spin_settings")
-      .select("is_active")
-      .eq("id", "global")
-      .maybeSingle();
-
-    if (!settingErr && setting && !setting.is_active) {
-      return { ok: false, error: "Spin the Wheel is currently inactive." };
-    }
-
-    // 2. Fetch site_content and enabled rewards
-    const [contentRes, rewardsRes, statsRes] = await Promise.all([
+    // 1 & 2. Fetch setting, site_content, enabled rewards, and stats in parallel (single roundtrip)
+    const [settingRes, contentRes, rewardsRes, statsRes] = await Promise.all([
+      supabase.from("spin_settings").select("is_active").eq("id", "global").maybeSingle(),
       supabase.from("site_content").select("id, data").limit(1).maybeSingle(),
       supabase.from("spin_rewards").select("*").eq("enabled", true).order("created_at", { ascending: true }),
       supabase.from("spin_stats").select("total_spins").eq("id", "global").maybeSingle(),
     ]);
+
+    if (!settingRes.error && settingRes.data && !settingRes.data.is_active) {
+      return { ok: false, error: "Spin the Wheel is currently inactive." };
+    }
 
     const activeRewards =
       rewardsRes.data && rewardsRes.data.length > 0
@@ -225,11 +219,6 @@ export async function processDirectSpinPlay(opts?: {
     if (statsRes.data && typeof statsRes.data.total_spins === "number") {
       nextTotal = statsRes.data.total_spins + 1;
     }
-    await supabase.from("spin_stats").upsert({
-      id: "global",
-      total_spins: nextTotal,
-      updated_at: new Date().toISOString(),
-    });
 
     // 6. Record history entry
     const historyItem: SpinControlHistoryItem = {
@@ -243,19 +232,24 @@ export async function processDirectSpinPlay(opts?: {
 
     control.history = [historyItem, ...(control.history || [])].slice(0, 100);
 
-    // 7. Persist back to site_content.data.spinControl
-    if (contentRow && contentRow.id) {
-      await supabase
-        .from("site_content")
-        .update({
+    // 7. Persist spin stats and control history in parallel
+    const updateStatsPromise = supabase.from("spin_stats").upsert({
+      id: "global",
+      total_spins: nextTotal,
+      updated_at: new Date().toISOString(),
+    });
+
+    const updateContentPromise = (contentRow && contentRow.id)
+      ? supabase.from("site_content").update({
           data: {
             ...contentData,
             spinControl: control,
           },
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", contentRow.id);
-    }
+        }).eq("id", contentRow.id)
+      : Promise.resolve();
+
+    await Promise.all([updateStatsPromise, updateContentPromise]);
 
     // Synchronize memory fallback
     memoryState.totalSpins = nextTotal;
@@ -320,25 +314,19 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
   try {
     const supabase = getSupabaseBackend();
 
-    // 1. Check if spin is active
-    const { data: setting, error: settingErr } = await supabase
-      .from("spin_settings")
-      .select("is_active")
-      .eq("id", "global")
-      .maybeSingle();
+    // 1 & 2. Check setting and query code in parallel
+    const [settingRes, codeRes] = await Promise.all([
+      supabase.from("spin_settings").select("is_active").eq("id", "global").maybeSingle(),
+      supabase.from("spin_codes").select("*").ilike("code", code).maybeSingle(),
+    ]);
 
-    if (!settingErr && setting && !setting.is_active) {
+    if (!settingRes.error && settingRes.data && !settingRes.data.is_active) {
       return { ok: false, error: "Spin the Wheel is currently inactive." };
     }
 
-    // 2. Query the code from Supabase spin_codes table
-    const { data: codeRow, error: codeErr } = await supabase
-      .from("spin_codes")
-      .select("*")
-      .ilike("code", code)
-      .maybeSingle();
+    const codeRow = codeRes.data;
 
-    if (!codeErr && codeRow) {
+    if (!codeRes.error && codeRow) {
       // Security Check: One code = One spin ONLY
       if (codeRow.used) {
         const usedDate = codeRow.used_at
@@ -350,33 +338,18 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
         };
       }
 
-      // Fetch enabled wheel rewards to find matching slice
-      const { data: rewards } = await supabase
-        .from("spin_rewards")
-        .select("*")
-        .eq("enabled", true)
-        .order("created_at", { ascending: true });
+      // Fetch enabled wheel rewards and spin_stats in parallel
+      const [rewardsRes, statsRes] = await Promise.all([
+        supabase.from("spin_rewards").select("*").eq("enabled", true).order("created_at", { ascending: true }),
+        supabase.from("spin_stats").select("total_spins").eq("id", "global").maybeSingle(),
+      ]);
 
-      const activeRewards = rewards && rewards.length > 0 ? rewards : memoryState.rewards;
+      const activeRewards = rewardsRes.data && rewardsRes.data.length > 0 ? rewardsRes.data : memoryState.rewards;
 
       // Increment total_spins
       let nextTotal = 1;
-      const { data: statsRow } = await supabase
-        .from("spin_stats")
-        .select("total_spins")
-        .eq("id", "global")
-        .maybeSingle();
-
-      if (statsRow && typeof statsRow.total_spins === "number") {
-        nextTotal = statsRow.total_spins + 1;
-        await supabase
-          .from("spin_stats")
-          .update({ total_spins: nextTotal, updated_at: new Date().toISOString() })
-          .eq("id", "global");
-      } else {
-        await supabase
-          .from("spin_stats")
-          .upsert({ id: "global", total_spins: nextTotal, updated_at: new Date().toISOString() });
+      if (statsRes.data && typeof statsRes.data.total_spins === "number") {
+        nextTotal = statsRes.data.total_spins + 1;
       }
 
       // Exact Pre-Assigned Prize
@@ -388,7 +361,6 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
         (r: any) => r.reward_name.trim().toLowerCase() === normalizedPrize
       );
       if (sliceIndex === -1) {
-        // Fallback match (e.g. "Brand Cup" vs "Cup")
         sliceIndex = activeRewards.findIndex(
           (r: any) =>
             r.reward_name.toLowerCase().includes(normalizedPrize) ||
@@ -397,14 +369,18 @@ export async function processSpinPlay(codeRaw: string): Promise<SpinPlayResponse
       }
       if (sliceIndex === -1) sliceIndex = 0;
 
-      // Mark code as USED in Supabase
-      await supabase
-        .from("spin_codes")
-        .update({
+      // Persist total_spins and mark code as USED in parallel
+      await Promise.all([
+        supabase.from("spin_stats").upsert({
+          id: "global",
+          total_spins: nextTotal,
+          updated_at: new Date().toISOString(),
+        }),
+        supabase.from("spin_codes").update({
           used: true,
           used_at: new Date().toISOString(),
-        })
-        .eq("id", codeRow.id);
+        }).eq("id", codeRow.id),
+      ]);
 
       return {
         ok: true,

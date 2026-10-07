@@ -69,8 +69,15 @@ export default function SpinWheelPage() {
     }
 
     setErrorMsg("");
-    setIsSpinning(true);
     setShowConfetti(false);
+
+    // Instant tactile response: Wheel begins spinning at t=0ms with 0 delay!
+    const currentFullSpins = Math.floor(rotation / 360);
+    const targetSpinsCount = currentFullSpins + 25; // 25 full revolutions for authentic 20s showcase
+    const initialAngle = targetSpinsCount * 360;
+
+    setIsSpinning(true);
+    setRotation(initialAngle);
 
     try {
       const res = await fetch("/api/spin/play", {
@@ -88,23 +95,20 @@ export default function SpinWheelPage() {
       if (!res.ok || !data.ok) {
         setErrorMsg(data.error || "Unable to spin.");
         setIsSpinning(false);
+        setRotation(rotation);
         return;
       }
 
-      // Backend confirmed win! Calculate exact degrees to land on the winning slice
+      // Backend confirmed win! Align exact slice degrees to land on winning prize under 12 o'clock pointer
       const count = rewards.length || 1;
       const sliceAngle = 360 / count;
       const targetSlice = typeof data.sliceIndex === "number" ? data.sliceIndex : 0;
       const sliceCenter = targetSlice * sliceAngle + sliceAngle / 2;
-
-      // 14 full revolutions (5040deg) + offset to align pointer at 12 o'clock for a thrilling suspenseful 11s spin
-      const currentFullSpins = Math.floor(rotation / 360);
-      const nextSpins = (currentFullSpins + 14) * 360;
-      const finalAngle = nextSpins + (360 - sliceCenter);
+      const finalAngle = targetSpinsCount * 360 + (360 - sliceCenter);
 
       setRotation(finalAngle);
 
-      // Wait for 11s animation to settle completely
+      // Wait for 20s animation to settle completely
       setTimeout(() => {
         setIsSpinning(false);
         setShowConfetti(true);
@@ -112,10 +116,11 @@ export default function SpinWheelPage() {
           prize: data.prize || "Exciting Reward",
           code: trimmedCode || (data.spinNumber ? `SPIN #${data.spinNumber}` : "LUCKY-WIN"),
         });
-      }, 11150);
+      }, 20150);
     } catch (err: any) {
       setErrorMsg(err?.message || "Network error. Please try again.");
       setIsSpinning(false);
+      setRotation(rotation);
     }
   };
 
@@ -216,7 +221,7 @@ export default function SpinWheelPage() {
               slices={rewards}
               rotation={rotation}
               isSpinning={isSpinning}
-              durationSeconds={11}
+              durationSeconds={20}
               onSpinClick={triggerSpin}
             />
             <div className="flex items-center gap-3 mt-4 text-[11px] text-slate-400 font-medium tracking-wide">
